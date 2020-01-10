@@ -64,12 +64,19 @@ print(tempo)
 '''
 
 
-
 # Image
+width, height = 1920, 1080
 '''
-w, h = 1920, 1080
-data = np.zeros((h, w, 3), dtype=np.uint8)
+data = np.zeros((height, width, 3), dtype=np.uint8)
 data[0:256, 0:256] = [255, 127, 0] # red patch in upper left
 img = Image.fromarray(data, 'RGB')
 img.save('my.png')
 '''
+
+# Keyboard visual
+octave = np.array([1,0,1,0,1,1,0,1,0,1,0,1])
+full = np.tile(octave, 11)[:128]
+start, end = 21, 109
+keyboard = full[start:end]
+whitecount = np.count_nonzero(keyboard == 1)
+print(whitecount)
