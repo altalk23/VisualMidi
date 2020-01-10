@@ -2,14 +2,16 @@ from PIL import Image
 import numpy as np
 from mido import MidiFile, tempo2bpm
 
+
 # Midi
+'''
 trackcount, maxnote = 2, 8
-data = np.zeros((trackcount, maxnote, 4), dtype=np.uint32)
+data = np.zeros((trackcount, maxnote, 4), dtype=np.uint64)
 cont = np.full((128), -1, dtype=np.int32)
 
 keysignature = ''
 maxtempo = 4
-tempo = np.zeros((4, 2), dtype=np.uint32)
+tempo = np.zeros((4, 2), dtype=np.uint64)
 
 mid = MidiFile('logic-tempo.mid')
 
@@ -19,7 +21,10 @@ idx = 0
 # meta messages
 for msg in mid.tracks[0]:
     print(msg)
-    time += msg.time
+    if idx == 0:
+        time += msg.time
+    else:
+        time += msg.time * tempo[idx-1][0]
 
     if msg.type == 'key_signature':
         keysignature = msg.key
@@ -28,16 +33,21 @@ for msg in mid.tracks[0]:
         tempo[idx] = [msg.tempo,time]
         idx += 1
 
+
+
 # track data
 for trackidx, track in enumerate(mid.tracks[1:]):
     print('Track {}: {}'.format(trackidx, track.name))
     time = 0
     idx = 0
-    
+    tempoidx = 0
+
     # using note on note off for now — well logic pro exports like that
     for msg in track:
         print(msg)
-        time += msg.time
+        time += msg.time * tempo[tempoidx][0]
+        if time >= tempo[tempoidx+1][1] and tempo[tempoidx+1][1] > 0:
+            tempoidx += 1
 
         if msg.type == 'note_on':
             data[trackidx][idx] = [time, msg.note, msg.velocity, 0]
@@ -51,6 +61,8 @@ for trackidx, track in enumerate(mid.tracks[1:]):
     print('')
 print(data)
 print(tempo)
+'''
+
 
 
 # Image
