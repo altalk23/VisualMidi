@@ -9,7 +9,7 @@ cont = np.full((128), -1, dtype=np.int32)
 
 keysignature = ''
 maxtempo = 4
-tempo = np.zeros((4, 2), dtype=np.double)
+tempo = np.zeros((4, 2), dtype=np.uint32)
 
 mid = MidiFile('logic-tempo.mid')
 
@@ -25,13 +25,15 @@ for msg in mid.tracks[0]:
         keysignature = msg.key
 
     elif msg.type == 'set_tempo':
-        tempo[idx] = [tempo2bpm(msg.tempo),time]
+        tempo[idx] = [msg.tempo,time]
         idx += 1
 
+# track data
 for trackidx, track in enumerate(mid.tracks[1:]):
     print('Track {}: {}'.format(trackidx, track.name))
     time = 0
     idx = 0
+    
     # using note on note off for now — well logic pro exports like that
     for msg in track:
         print(msg)
@@ -41,12 +43,11 @@ for trackidx, track in enumerate(mid.tracks[1:]):
             data[trackidx][idx] = [time, msg.note, msg.velocity, 0]
             cont[msg.note] = idx
             idx += 1
-            pass
 
         elif msg.type == 'note_off':
             data[trackidx][cont[msg.note]][3] = time
             cont[msg.note] = -1
-            pass
+
     print('')
 print(data)
 print(tempo)
