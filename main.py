@@ -3,18 +3,34 @@ import numpy as np
 from mido import MidiFile
 
 # Midi
-trackcount, maxnote = 2, 8
-data = np.zeros((trackcount, maxnote, 3), dtype=np.uint32)
+trackcount, maxnote = 3, 8
+data = np.zeros((trackcount, maxnote, 4), dtype=np.uint32)
+idx = [0,0,0]
+time = 0
+cont = np.full((128), -1, dtype=np.int32)
 
 mid = MidiFile('logic.mid')
-for i, track in enumerate(mid.tracks):
-    print('Track {}: {}'.format(i, track.name))
+for trackidx, track in enumerate(mid.tracks):
+    print('Track {}: {}'.format(trackidx, track.name))
     # using note on note off for now
+    time = 0
     for msg in track:
+        if not msg.is_meta: print(msg)
+        print('')
+        time += msg.time
+
         if msg.type == 'note_on':
+            data[trackidx][idx[trackidx]] = [time, msg.note, msg.velocity, 0]
+            cont[msg.note] = trackidx
+            idx[trackidx] += 1
             pass
-        elif if msg.type == 'note_off':
+
+        elif msg.type == 'note_off':
+            data[trackidx][cont[msg.note]][3] = time
+            cont[msg.note] = -1
             pass
+
+print(data)
 
 # Image
 '''
