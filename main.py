@@ -13,7 +13,7 @@ parser.add_argument('-hi', '--height', type=int, default=1080, help='height of t
 parser.add_argument('-s', '--start', type=int, default=21, help='start note')
 parser.add_argument('-e', '--end', type=int, default=108, help='end note')
 parser.add_argument('-kh', '--keyboard-height', type=int, default=210, help='keyboard height')
-parser.add_argument('-st', '--stretch', type=int, default=960000000, help='stretch constant')
+parser.add_argument('-st', '--stretch', type=int, default=1, help='stretch constant')
 parser.add_argument('-o', '--output', type=str, default='out.png', help='name of the output')
 parser.add_argument('-sp', '--speed', type=int, default=1, help='playback speed')
 
@@ -24,7 +24,7 @@ mid = MidiFile(args.midifile)
 width, height = args.width, args.height
 start, end = args.start, args.end+1
 keyboardheight = args.keyboard_height
-stretch = args.stretch
+stretch = args.stretch * 960000000
 outputname = args.output
 speed = args.speed * 20000000 #480000000/24 1 second constant / 24 frame per second
 
@@ -44,7 +44,7 @@ time = 0
 idx = 0
 # meta messages
 for msg in mid.tracks[0]:
-    print(msg)
+    #print(msg)
     if idx == 0:
         time += msg.time
     else:
@@ -62,14 +62,14 @@ maxtime = 0
 
 # track data
 for trackidx, track in enumerate(mid.tracks[1:]):
-    print('Track {}: {}'.format(trackidx, track.name))
+    #print('Track {}: {}'.format(trackidx, track.name))
     time = 0
     idx = 0
     tempoidx = 0
 
     # using note on note off for now — well logic pro exports like that
     for msg in track:
-        print(msg)
+        #print(msg)
         time += msg.time * tempo[tempoidx][0]
         if time >= tempo[tempoidx+1][1] and tempo[tempoidx+1][1] > 0:
             tempoidx += 1
@@ -84,9 +84,9 @@ for trackidx, track in enumerate(mid.tracks[1:]):
             cont[msg.note] = -1
         maxtime = max(maxtime, time)
 
-    print('')
-print(data)
-print(tempo)
+    #print('')
+#print(data)
+#print(tempo)
 
 
 
@@ -94,8 +94,7 @@ print(tempo)
 
 # Visual
 octave = np.array([1,0,1,0,1,1,0,1,0,1,0,1])
-full = np.tile(octave, 11)[:128]
-keyboard = full[start:end]
+keyboard = np.tile(octave, 11)[start:end]
 whitecount = np.count_nonzero(keyboard == 1)
 notes = np.zeros((end-start,4), dtype=np.int16)
 idx = 0
@@ -121,14 +120,17 @@ for note in range(end-start):
             max(round(prevnote-blackwidth*blackconstant[(start+note)%12][0]), 0),
             round(notes[note-1][1]+blackwidth*blackconstant[(start+note)%12][1]), 0, note+start
         ]
-print(notes)
+#print(notes)
 
 def notewidth(n):
-    return notes[n-start][0:2]
+    return notes[int(n-start)][0:2]
 
 windowheight = height-keyboardheight-2
 def noteheight(s, e, curr):
-    return notes[n-start][0:2]
+    return (
+        int(windowheight-max((s-curr)/speed, 0) * (windowheight * speed / stretch)),
+        int(windowheight-min((e-curr)/speed, stretch/speed) * (windowheight * speed / stretch))
+    )
 
 def color(n):
     return [
@@ -170,7 +172,7 @@ while finished:
     for trackidx, track in enumerate(data):
         while idx[trackidx][0] < maxnote and track[idx[trackidx][0]][0] < stretch + curr :
             if track[idx[trackidx][0]][3] != 0:
-                heappush(seen, (track[idx[trackidx][0]][3], track[idx[trackidx][0]][0], track[idx[trackidx][0]][1]))
+                heappush(seen, (track[idx[trackidx][0]][3], track[idx[trackidx][0]][0], track[idx[trackidx][0]][1], trackidx))
             idx[trackidx][0]+=1
 
         while idx[trackidx][1] < maxnote and track[idx[trackidx][1]][0] < curr :
@@ -182,22 +184,23 @@ while finished:
         pressed[seen[0][2]] = -1
         heappop(seen)
 
-    # print
-    print(curr)
+    # test draw
+    frameimage = np.zeros((height, width, 3), dtype=np.uint8)
+    drawkeyboard(frameimage)
+
     for s in seen:
-        print(s)
-    print(pressed)
-    print('')
+        h = noteheight(s[1], s[0], curr)
+        w = notewidth(s[2])
+        frameimage[h[1]:h[0], w[0]:w[1]] = color(s[3])
+
+
 
     # end
     if curr > maxtime: break
 
-    # test draw
-    frameimage = np.zeros((height, width, 3), dtype=np.uint8)
-    drawkeyboard(frameimage)
     img = Image.fromarray(frameimage, 'RGB')
-    img.save('out/'+str(curr)+'.png')
-
+    img.save('out/'+str(curr/speed)+'.png')
 
     #next
     curr += speed
+    print(int(curr/speed))
