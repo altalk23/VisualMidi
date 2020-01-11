@@ -13,6 +13,7 @@ parser.add_argument('-s', '--start', type=int, default=21, help='start note')
 parser.add_argument('-e', '--end', type=int, default=108, help='end note')
 parser.add_argument('-kh', '--keyboard-height', type=int, default=210, help='keyboard height')
 parser.add_argument('-st', '--stretch', type=int, default=960000000, help='stretch constant')
+parser.add_argument('-o', '--output', type=str, default='out.png', help='name of the output')
 
 
 args = parser.parse_args()
@@ -22,6 +23,7 @@ width, height = args.width, args.height
 start, end = args.start, args.end+1
 keyboardheight = args.keyboard_height
 stretch = args.stretch
+outputname = args.output
 
 # Midi
 
@@ -128,4 +130,4 @@ for note in notes:
     if note[2] == 0:
         image[-keyboardheight:-round((3*keyboardheight)/7), note[0]+1:note[1]-1] = [31,31,31]
 img = Image.fromarray(image, 'RGB')
-img.save('my.png')
+img.save(outputname)

@@ -15,3 +15,4 @@ Okay, enough weird things. So I am doing this because I couldn't find a good mid
 - [ ] Adding background  
 - [ ] Making better visuals  
 - [ ] Adding background music  
+- [ ] Config file
