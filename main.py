@@ -1,7 +1,23 @@
 from PIL import Image
 import numpy as np
 from mido import MidiFile, tempo2bpm
+import argparse
 
+# Arguments
+
+parser = argparse.ArgumentParser(description='Turn midi into visual falling notes.')
+parser.add_argument('midifile', type=str, help='midi file to visualize')
+parser.add_argument('-wi', '--width', type=int, default=1920, help='width of the video')
+parser.add_argument('-hi', '--height', type=int, default=1080, help='height of the video')
+parser.add_argument('-s', '--start', type=int, default=21, help='start note')
+parser.add_argument('-e', '--end', type=int, default=108, help='end note')
+
+
+args = parser.parse_args()
+
+mid = MidiFile(args.midifile)
+width, height = args.width, args.height
+start, end = args.start, args.end+1
 
 # Midi
 '''
@@ -13,7 +29,7 @@ keysignature = ''
 maxtempo = 4
 tempo = np.zeros((4, 2), dtype=np.uint64)
 
-mid = MidiFile('logic-tempo.mid')
+
 
 time = 0
 idx = 0
@@ -65,7 +81,6 @@ print(tempo)
 
 
 # Image
-width, height = 1920, 1080
 '''
 data = np.zeros((height, width, 3), dtype=np.uint8)
 data[0:256, 0:256] = [255, 127, 0] # red patch in upper left
@@ -76,7 +91,6 @@ img.save('my.png')
 # Keyboard visual
 octave = np.array([1,0,1,0,1,1,0,1,0,1,0,1])
 full = np.tile(octave, 11)[:128]
-start, end = 21, 109
 keyboard = full[start:end]
 whitecount = np.count_nonzero(keyboard == 1)
 print(whitecount)
