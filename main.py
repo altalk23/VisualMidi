@@ -14,6 +14,7 @@ parser.add_argument('-e', '--end', type=int, default=108, help='end note')
 parser.add_argument('-kh', '--keyboard-height', type=int, default=210, help='keyboard height')
 parser.add_argument('-st', '--stretch', type=int, default=960000000, help='stretch constant')
 parser.add_argument('-o', '--output', type=str, default='out.png', help='name of the output')
+parser.add_argument('-sp', '--speed', type=int, default=1, help='playback speed')
 
 
 args = parser.parse_args()
@@ -24,6 +25,7 @@ start, end = args.start, args.end+1
 keyboardheight = args.keyboard_height
 stretch = args.stretch
 outputname = args.output
+speed = args.speed * 20000000 #480000000/24 1 second constant / 24 frame per second
 
 # Midi
 
@@ -119,15 +121,19 @@ for note in range(end-start):
         ]
 print(notes)
 
-
-# Image
-image = np.zeros((height, width, 3), dtype=np.uint8)
-
-for note in notes:
+keyboardimage = np.zeros((height, width, 3), dtype=np.uint8)
+for note in notes[notes[:,2].argsort()][::-1]:
     if note[2] == 1:
-        image[-keyboardheight:-1, note[0]+2:note[1]-2] = [255,255,255]
-for note in notes:
+        keyboardimage[-keyboardheight:-1, note[0]+2:note[1]-2] = [255,255,255]
     if note[2] == 0:
-        image[-keyboardheight:-round((3*keyboardheight)/7), note[0]+1:note[1]-1] = [31,31,31]
-img = Image.fromarray(image, 'RGB')
+        keyboardimage[-keyboardheight:-round((3*keyboardheight)/7), note[0]+1:note[1]-1] = [31,31,31]
+
+
+# Notes
+
+def dimensions(n):
+    return notes[n-start][0:1]
+
+copyimg = np.copy(keyboardimage)
+img = Image.fromarray(copyimg, 'RGB')
 img.save(outputname)
