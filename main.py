@@ -124,7 +124,11 @@ print(notes)
 
 pressed = np.full((128), -1, dtype=np.int8)
 
-def dimensions(n):
+def notewidth(n):
+    return notes[n-start][0:2]
+
+windowheight = height-keyboardheight-2
+def noteheight(s, e, curr):
     return notes[n-start][0:2]
 
 def color(n):
@@ -162,17 +166,18 @@ cont = np.full((maxcont,2), -1, dtype=np.int8)
 
 finished = True
 curr = 0
-window = height-keyboardheight-2
 seen = []
 while finished:
     for trackidx, track in enumerate(data):
         while idx[trackidx] < maxnote and track[idx[trackidx]][0] < stretch + curr :
             if track[idx[trackidx]][3] != 0:
-                seen.append((track[idx[trackidx]][1], track[idx[trackidx]][3]))
+                heappush(seen, (track[idx[trackidx]][3], track[idx[trackidx]][0], track[idx[trackidx]][1]))
             idx[trackidx]+=1
-    sortedseen = sorted(seen, key=lambda x : x[1]) # ah yes, i see not efficent code
+    while len(seen) > 0 and seen[0][0] < curr:
+        heappop(seen)
     print(curr)
-    print(sortedseen)
+    for s in seen:
+        print(s)
     print('')
     if curr > 1440000000: break
     curr += speed
