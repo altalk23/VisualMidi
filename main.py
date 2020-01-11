@@ -203,4 +203,4 @@ while finished:
 
     #next
     curr += speed
-    print(int(curr/speed))
+    print(int(curr/speed)) 
