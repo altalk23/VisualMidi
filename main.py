@@ -3,19 +3,22 @@ import numpy as np
 from mido import MidiFile, tempo2bpm
 import argparse
 from heapq import heappush, heappop
+import os
+from cv2 import imread, VideoWriter, destroyAllWindows, VideoWriter_fourcc
+
 
 # Arguments
 
 parser = argparse.ArgumentParser(description='Turn midi into visual falling notes.')
 parser.add_argument('midifile', type=str, help='midi file to visualize')
-parser.add_argument('-wi', '--width', type=int, default=1920, help='width of the video')
-parser.add_argument('-hi', '--height', type=int, default=1080, help='height of the video')
+parser.add_argument('-W', '--width', type=int, default=1920, help='width of the video')
+parser.add_argument('-H', '--height', type=int, default=1080, help='height of the video')
 parser.add_argument('-s', '--start', type=int, default=21, help='start note')
 parser.add_argument('-e', '--end', type=int, default=108, help='end note')
-parser.add_argument('-kh', '--keyboard-height', type=int, default=210, help='keyboard height')
-parser.add_argument('-st', '--stretch', type=int, default=1, help='stretch constant')
-parser.add_argument('-o', '--output', type=str, default='out.png', help='name of the output')
-parser.add_argument('-sp', '--speed', type=int, default=1, help='playback speed')
+parser.add_argument('-K', '--keyboard-height', type=int, default=210, help='keyboard height')
+parser.add_argument('-T', '--stretch', type=int, default=1, help='stretch constant')
+parser.add_argument('-o', '--output', type=str, default='out.mp4', help='name of the output')
+parser.add_argument('-S', '--speed', type=int, default=1, help='playback speed')
 
 
 args = parser.parse_args()
@@ -166,6 +169,7 @@ cont = np.full((maxcont,2), -1, dtype=np.int8)
 finished = True
 curr = 0
 seen = []
+os.system('rm -rf out ; mkdir out')
 
 while finished:
     # add incoming notes
@@ -199,8 +203,16 @@ while finished:
     if curr > maxtime: break
 
     img = Image.fromarray(frameimage, 'RGB')
-    img.save('out/'+str(curr/speed)+'.png')
+    img.save('out/%04d.png' % (int(curr/speed)))
 
     #next
     curr += speed
-    print(int(curr/speed)) 
+    print(int(curr/speed))
+
+images = [img for img in os.listdir('out') if img.endswith(".png")]
+images.sort()
+video = VideoWriter(outputname, 0x7634706d, 24, (width,height))
+for image in images:
+    video.write(imread(os.path.join('out', image)))
+destroyAllWindows()
+video.release()
