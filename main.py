@@ -2,6 +2,7 @@ from PIL import Image
 import numpy as np
 from mido import MidiFile, tempo2bpm
 import argparse
+from heapq import heappush, heappop
 
 # Arguments
 
@@ -152,3 +153,26 @@ for note in notes[notes[:,2].argsort()][::-1]:
 copyimg = np.copy(keyboardimage)
 img = Image.fromarray(copyimg, 'RGB')
 img.save(outputname)
+
+# Notes
+
+maxcont = 200
+idx = np.zeros((trackcount), dtype=np.uint32)
+cont = np.full((maxcont,2), -1, dtype=np.int8)
+
+finished = True
+curr = 0
+window = height-keyboardheight-2
+seen = []
+while finished:
+    for trackidx, track in enumerate(data):
+        while idx[trackidx] < maxnote and track[idx[trackidx]][0] < stretch + curr :
+            if track[idx[trackidx]][3] != 0:
+                seen.append((track[idx[trackidx]][1], track[idx[trackidx]][3]))
+            idx[trackidx]+=1
+    sortedseen = sorted(seen, key=lambda x : x[1]) # ah yes, i see not efficent code
+    print(curr)
+    print(sortedseen)
+    print('')
+    if curr > 1440000000: break
+    curr += speed
