@@ -42,7 +42,6 @@ tempo = np.zeros((4, 2), dtype=np.uint64)
 
 time = 0
 idx = 0
-
 # meta messages
 for msg in mid.tracks[0]:
     print(msg)
@@ -59,6 +58,7 @@ for msg in mid.tracks[0]:
         idx += 1
 
 
+maxtime = 0
 
 # track data
 for trackidx, track in enumerate(mid.tracks[1:]):
@@ -82,6 +82,7 @@ for trackidx, track in enumerate(mid.tracks[1:]):
         elif msg.type == 'note_off':
             data[trackidx][cont[msg.note]][3] = time
             cont[msg.note] = -1
+        maxtime = max(maxtime, time)
 
     print('')
 print(data)
@@ -122,8 +123,6 @@ for note in range(end-start):
         ]
 print(notes)
 
-pressed = np.full((128), -1, dtype=np.int8)
-
 def notewidth(n):
     return notes[n-start][0:2]
 
@@ -139,45 +138,66 @@ def color(n):
         [31,31,31]
     ][n]
 
-pressed[60] = 0
+pressed = np.full((128), -1, dtype=np.int8)
 
-keyboardimage = np.zeros((height, width, 3), dtype=np.uint8)
-for note in notes[notes[:,2].argsort()][::-1]:
-    if note[2] == 1:
-        keyboardimage[-keyboardheight:-1, note[0]+2:note[1]-2
-        ] = color(pressed[note[3]]) if pressed[note[3]] != -1 else color(-2)
-    if note[2] == 0:
-        keyboardimage[-keyboardheight:-round((3*keyboardheight)/7), note[0]+1:note[1]-1
-        ] = color(pressed[note[3]]) if pressed[note[3]] != -1 else color(-1)
-
-
+def drawkeyboard(frameimage):
+    for note in notes[notes[:,2].argsort()][::-1]:
+        if note[2] == 1:
+            frameimage[-keyboardheight:-1, note[0]+2:note[1]-2
+            ] = color(pressed[note[3]]) if pressed[note[3]] != -1 else color(-2)
+        if note[2] == 0:
+            frameimage[-keyboardheight:-round((3*keyboardheight)/7), note[0]+1:note[1]-1
+            ] = color(pressed[note[3]]) if pressed[note[3]] != -1 else color(-1)
 
 
-
+'''
 copyimg = np.copy(keyboardimage)
 img = Image.fromarray(copyimg, 'RGB')
 img.save(outputname)
-
+'''
 # Notes
 
 maxcont = 200
-idx = np.zeros((trackcount), dtype=np.uint32)
+idx = np.zeros((trackcount, 2), dtype=np.uint32)
 cont = np.full((maxcont,2), -1, dtype=np.int8)
 
 finished = True
 curr = 0
 seen = []
+
 while finished:
+    # add incoming notes
     for trackidx, track in enumerate(data):
-        while idx[trackidx] < maxnote and track[idx[trackidx]][0] < stretch + curr :
-            if track[idx[trackidx]][3] != 0:
-                heappush(seen, (track[idx[trackidx]][3], track[idx[trackidx]][0], track[idx[trackidx]][1]))
-            idx[trackidx]+=1
+        while idx[trackidx][0] < maxnote and track[idx[trackidx][0]][0] < stretch + curr :
+            if track[idx[trackidx][0]][3] != 0:
+                heappush(seen, (track[idx[trackidx][0]][3], track[idx[trackidx][0]][0], track[idx[trackidx][0]][1]))
+            idx[trackidx][0]+=1
+
+        while idx[trackidx][1] < maxnote and track[idx[trackidx][1]][0] < curr :
+            if track[idx[trackidx][1]][3] != 0:
+                pressed[track[idx[trackidx][1]][1]] = trackidx
+            idx[trackidx][1]+=1
+    # remove past notes
     while len(seen) > 0 and seen[0][0] < curr:
+        pressed[seen[0][2]] = -1
         heappop(seen)
+
+    # print
     print(curr)
     for s in seen:
         print(s)
+    print(pressed)
     print('')
-    if curr > 1440000000: break
+
+    # end
+    if curr > maxtime: break
+
+    # test draw
+    frameimage = np.zeros((height, width, 3), dtype=np.uint8)
+    drawkeyboard(frameimage)
+    img = Image.fromarray(frameimage, 'RGB')
+    img.save('out/'+str(curr)+'.png')
+
+
+    #next
     curr += speed

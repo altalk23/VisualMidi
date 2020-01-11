@@ -4,3 +4,6 @@ Thumbs.db
 
 # ignore fonts
 *.ttf
+
+# ignore out folder
+out/
