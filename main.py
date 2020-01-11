@@ -9,7 +9,7 @@ from cv2 import imread, VideoWriter, destroyAllWindows, VideoWriter_fourcc
 
 # Arguments
 
-parser = argparse.ArgumentParser(description='Turn midi into visual falling notes.')
+parser = argparse.ArgumentParser(description='Turn midi into visual falling notes.',formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('midifile', type=str, help='midi file to visualize')
 parser.add_argument('-W', '--width', type=int, default=1920, help='width of the video')
 parser.add_argument('-H', '--height', type=int, default=1080, help='height of the video')
@@ -19,6 +19,8 @@ parser.add_argument('-K', '--keyboard-height', type=int, default=210, help='keyb
 parser.add_argument('-T', '--stretch', type=int, default=1, help='stretch constant')
 parser.add_argument('-o', '--output', type=str, default='out.mp4', help='name of the output')
 parser.add_argument('-S', '--speed', type=int, default=1, help='playback speed')
+parser.add_argument('-t', '--track-count', type=int, default=16, help='max track count')
+parser.add_argument('-m', '--max-note', type=int, default=1000, help='max note count, because i am lazy to measure')
 
 
 args = parser.parse_args()
@@ -30,10 +32,10 @@ keyboardheight = args.keyboard_height
 stretch = args.stretch * 960000000
 outputname = args.output
 speed = args.speed * 20000000 #480000000/24 1 second constant / 24 frame per second
+trackcount, maxnote = args.track_count, args.max_note
 
 # Midi
 
-trackcount, maxnote = 2, 8
 data = np.zeros((trackcount, maxnote, 4), dtype=np.uint64)
 cont = np.full((128), -1, dtype=np.int32)
 
@@ -123,7 +125,7 @@ for note in range(end-start):
             max(round(prevnote-blackwidth*blackconstant[(start+note)%12][0]), 0),
             round(notes[note-1][1]+blackwidth*blackconstant[(start+note)%12][1]), 0, note+start
         ]
-#print(notes)
+
 
 def notewidth(n):
     return notes[int(n-start)][0:2]
