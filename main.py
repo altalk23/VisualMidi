@@ -91,10 +91,11 @@ octave = np.array([1,0,1,0,1,1,0,1,0,1,0,1])
 full = np.tile(octave, 11)[:128]
 keyboard = full[start:end]
 whitecount = np.count_nonzero(keyboard == 1)
-notes = np.zeros((end-start,3), dtype=np.uint16)
+notes = np.zeros((end-start,3), dtype=np.int16)
 idx = 0
 blackwidth = round(width / whitecount) / 1.5
 for note in range(end-start):
+    prevnote = notes[note-1][1]
     if keyboard[note] == 1: idx += 1
     whitewidth = round((width * idx) / whitecount)
     if keyboard[note] == 1:
@@ -104,19 +105,19 @@ for note in range(end-start):
             notes[note] = [notes[note-2][1], whitewidth, 1]
     else:
         if (start+note)%12 == 1:
-            notes[note] = [round(notes[note-1][1]-blackwidth/1.5), round(notes[note-1][1]+blackwidth/3), 0]
+            notes[note] = [max(round(prevnote-blackwidth/1.5), 0), round(notes[note-1][1]+blackwidth/3), 0]
             pass
         elif (start+note)%12 == 3:
-            notes[note] = [round(notes[note-1][1]-blackwidth/3), round(notes[note-1][1]+blackwidth/1.5), 0]
+            notes[note] = [max(round(prevnote-blackwidth/3), 0), round(notes[note-1][1]+blackwidth/1.5), 0]
             pass
         elif (start+note)%12 == 6:
-            notes[note] = [round(notes[note-1][1]-blackwidth*0.75), round(notes[note-1][1]+blackwidth*0.25), 0]
+            notes[note] = [max(round(prevnote-blackwidth*0.75), 0), round(notes[note-1][1]+blackwidth*0.25), 0]
             pass
         elif (start+note)%12 == 8:
-            notes[note] = [round(notes[note-1][1]-blackwidth*0.5), round(notes[note-1][1]+blackwidth*0.5), 0]
+            notes[note] = [max(round(prevnote-blackwidth*0.5), 0), round(notes[note-1][1]+blackwidth*0.5), 0]
             pass
         elif (start+note)%12 == 10:
-            notes[note] = [round(notes[note-1][1]-blackwidth*0.25), round(notes[note-1][1]+blackwidth*0.75), 0]
+            notes[note] = [max(round(prevnote-blackwidth*0.25), 0), round(notes[note-1][1]+blackwidth*0.75), 0]
             pass
 print(notes)
 
