@@ -11,6 +11,7 @@ parser.add_argument('-wi', '--width', type=int, default=1920, help='width of the
 parser.add_argument('-hi', '--height', type=int, default=1080, help='height of the video')
 parser.add_argument('-s', '--start', type=int, default=21, help='start note')
 parser.add_argument('-e', '--end', type=int, default=108, help='end note')
+parser.add_argument('-kh', '--keyboard-height', type=int, default=280, help='keyboard height')
 parser.add_argument('-st', '--stretch', type=int, default=960000000, help='stretch constant')
 
 
@@ -19,6 +20,7 @@ args = parser.parse_args()
 mid = MidiFile(args.midifile)
 width, height = args.width, args.height
 start, end = args.start, args.end+1
+keyboardheight = args.keyboard_height
 stretch = args.stretch
 
 # Midi
@@ -89,40 +91,44 @@ octave = np.array([1,0,1,0,1,1,0,1,0,1,0,1])
 full = np.tile(octave, 11)[:128]
 keyboard = full[start:end]
 whitecount = np.count_nonzero(keyboard == 1)
-notes = np.zeros((end-start,2), dtype=np.uint16)
+notes = np.zeros((end-start,3), dtype=np.uint16)
 idx = 0
+blackwidth = round(width / whitecount) / 1.5
 for note in range(end-start):
     if keyboard[note] == 1: idx += 1
     whitewidth = round((width * idx) / whitecount)
-    blackwidth = whitewidth / 1.5
     if keyboard[note] == 1:
         if (keyboard[note-1]) == 1:
-            notes[note] = [notes[note-1][1], whitewidth]
+            notes[note] = [notes[note-1][1], whitewidth, 1]
         else:
-            notes[note] = [notes[note-2][1], whitewidth]
+            notes[note] = [notes[note-2][1], whitewidth, 1]
     else:
         if (start+note)%12 == 1:
-            notes[note] = [round(notes[note-1][1]-blackwidth/1.5), round(notes[note-1][1]+blackwidth/3)]
+            notes[note] = [round(notes[note-1][1]-blackwidth/1.5), round(notes[note-1][1]+blackwidth/3), 0]
             pass
         elif (start+note)%12 == 3:
-            notes[note] = [round(notes[note-1][1]-blackwidth/3), round(notes[note-1][1]+blackwidth/1.5)]
+            notes[note] = [round(notes[note-1][1]-blackwidth/3), round(notes[note-1][1]+blackwidth/1.5), 0]
             pass
         elif (start+note)%12 == 6:
-            notes[note] = [round(notes[note-1][1]-blackwidth*0.75), round(notes[note-1][1]+blackwidth*0.25)]
+            notes[note] = [round(notes[note-1][1]-blackwidth*0.75), round(notes[note-1][1]+blackwidth*0.25), 0]
             pass
         elif (start+note)%12 == 8:
-            notes[note] = [round(notes[note-1][1]-blackwidth*0.5), round(notes[note-1][1]+blackwidth*0.5)]
+            notes[note] = [round(notes[note-1][1]-blackwidth*0.5), round(notes[note-1][1]+blackwidth*0.5), 0]
             pass
         elif (start+note)%12 == 10:
-            notes[note] = [round(notes[note-1][1]-blackwidth*0.25), round(notes[note-1][1]+blackwidth*0.75)]
+            notes[note] = [round(notes[note-1][1]-blackwidth*0.25), round(notes[note-1][1]+blackwidth*0.75), 0]
             pass
 print(notes)
 
 
 # Image
-'''
-data = np.zeros((height, width, 3), dtype=np.uint8)
-data[0:256, 0:256] = [255, 127, 0] # red patch in upper left
-img = Image.fromarray(data, 'RGB')
+image = np.zeros((height, width, 3), dtype=np.uint8)
+
+for note in notes:
+    if note[2] == 1:
+        image[0:keyboardheight, note[0]+2:note[1]-2] = [255,255,255]
+for note in notes:
+    if note[2] == 0:
+        image[0:round((4*keyboardheight)/7), note[0]+1:note[1]-1] = [31,31,31]
+img = Image.fromarray(image, 'RGB')
 img.save('my.png')
-'''
