@@ -95,7 +95,7 @@ octave = np.array([1,0,1,0,1,1,0,1,0,1,0,1])
 full = np.tile(octave, 11)[:128]
 keyboard = full[start:end]
 whitecount = np.count_nonzero(keyboard == 1)
-notes = np.zeros((end-start,3), dtype=np.int16)
+notes = np.zeros((end-start,4), dtype=np.int16)
 idx = 0
 blackwidth = round(width / whitecount) / 1.5
 blackconstant = {
@@ -111,13 +111,13 @@ for note in range(end-start):
     whitewidth = round((width * idx) / whitecount)
     if keyboard[note] == 1:
         if (keyboard[note-1]) == 1:
-            notes[note] = [notes[note-1][1], whitewidth, 1]
+            notes[note] = [notes[note-1][1], whitewidth, 1, note+start]
         else:
-            notes[note] = [notes[note-2][1], whitewidth, 1]
+            notes[note] = [notes[note-2][1], whitewidth, 1, note+start]
     else:
         notes[note] = [
             max(round(prevnote-blackwidth*blackconstant[(start+note)%12][0]), 0),
-            round(notes[note-1][1]+blackwidth*blackconstant[(start+note)%12][1]), 0
+            round(notes[note-1][1]+blackwidth*blackconstant[(start+note)%12][1]), 0, note+start
         ]
 print(notes)
 
@@ -134,17 +134,17 @@ def color(n):
         [31,31,31]
     ][n]
 
+pressed[60] = 0
+
 keyboardimage = np.zeros((height, width, 3), dtype=np.uint8)
-for idx, note in enumerate(notes[notes[:,2].argsort()][::-1]):
+for note in notes[notes[:,2].argsort()][::-1]:
     if note[2] == 1:
         keyboardimage[-keyboardheight:-1, note[0]+2:note[1]-2
-        ] = color(pressed[idx+start]) if pressed[idx+start] != -1 else color(-2)
+        ] = color(pressed[note[3]]) if pressed[note[3]] != -1 else color(-2)
     if note[2] == 0:
         keyboardimage[-keyboardheight:-round((3*keyboardheight)/7), note[0]+1:note[1]-1
-        ] = color(pressed[idx+start]) if pressed[idx+start] != -1 else color(-1)
+        ] = color(pressed[note[3]]) if pressed[note[3]] != -1 else color(-1)
 
-
-# Notes
 
 
 
@@ -152,5 +152,3 @@ for idx, note in enumerate(notes[notes[:,2].argsort()][::-1]):
 copyimg = np.copy(keyboardimage)
 img = Image.fromarray(copyimg, 'RGB')
 img.save(outputname)
-
-print(dimensions(60))
