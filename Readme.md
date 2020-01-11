@@ -8,7 +8,7 @@ Okay, enough weird things. So I am doing this because I couldn't find a good mid
 - [x] Fixing tempo changes  
 - [x] Visualizing keyboard  
 - [x] Visualizing notes  
-- [ ] Making this an actual video  
+- [x] Making this an actual video  
 
 #### Will be good if it is there:
 - [ ] Writing tempo, duration, key signature, etc.  
