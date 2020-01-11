@@ -7,3 +7,4 @@ Thumbs.db
 
 # ignore out folder
 out/
+out.*
