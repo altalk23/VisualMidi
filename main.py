@@ -5,12 +5,15 @@ import argparse
 from heapq import heappush, heappop
 import os
 from cv2 import imread, VideoWriter, destroyAllWindows, VideoWriter_fourcc
+from moviepy.editor import VideoFileClip
+
 
 
 # Arguments
 
 parser = argparse.ArgumentParser(description='Turn midi into visual falling notes.',formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('midifile', type=str, help='midi file to visualize')
+parser.add_argument('audio', type=str, help='audio file to put on')
 parser.add_argument('-W', '--width', type=int, default=1920, help='width of the video')
 parser.add_argument('-H', '--height', type=int, default=1080, help='height of the video')
 parser.add_argument('-s', '--start', type=int, default=21, help='start note')
@@ -21,11 +24,13 @@ parser.add_argument('-o', '--output', type=str, default='out.mp4', help='name of
 parser.add_argument('-S', '--speed', type=int, default=1, help='playback speed')
 parser.add_argument('-t', '--track-count', type=int, default=16, help='max track count')
 parser.add_argument('-m', '--max-note', type=int, default=1000, help='max note count, because i am lazy to measure')
+parser.add_argument('-M', '--max-tempo', type=int, default=16, help='max tempo count, because i am lazy to measure')
 
 
 args = parser.parse_args()
 
 mid = MidiFile(args.midifile)
+audioname = args.audio
 width, height = args.width, args.height
 start, end = args.start, args.end+1
 keyboardheight = args.keyboard_height
@@ -33,6 +38,7 @@ stretch = args.stretch * 960000000
 outputname = args.output
 speed = args.speed * 20000000 #480000000/24 1 second constant / 24 frame per second
 trackcount, maxnote = args.track_count, args.max_note
+maxtempo = args.max_tempo
 
 # Midi
 
@@ -40,8 +46,7 @@ data = np.zeros((trackcount, maxnote, 4), dtype=np.uint64)
 cont = np.full((128), -1, dtype=np.int32)
 
 keysignature = ''
-maxtempo = 4
-tempo = np.zeros((4, 2), dtype=np.uint64)
+tempo = np.zeros((maxtempo, 2), dtype=np.uint64)
 
 
 
@@ -49,7 +54,7 @@ time = 0
 idx = 0
 # meta messages
 for msg in mid.tracks[0]:
-    #print(msg)
+    print(msg)
     if idx == 0:
         time += msg.time
     else:
@@ -218,8 +223,11 @@ while finished:
 
 images = [img for img in os.listdir('out') if img.endswith(".png")]
 images.sort()
-video = VideoWriter(outputname, 0x7634706d, 24, (width,height))
+video = VideoWriter('out/0.mp4', 0x7634706d, 24, (width,height))
 for image in images:
     video.write(imread(os.path.join('out', image)))
 destroyAllWindows()
 video.release()
+
+outvideo = VideoFileClip('out/0.mp4')
+outvideo.write_videofile(outputname, audio=audioname)
