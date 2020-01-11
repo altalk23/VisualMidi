@@ -7,7 +7,7 @@ Okay, enough weird things. So I am doing this because I couldn't find a good mid
 - [x] Reading midi file  
 - [x] Fixing tempo changes  
 - [x] Visualizing keyboard  
-- [ ] Visualizing notes  
+- [x] Visualizing notes  
 - [ ] Making this an actual video  
 
 #### Will be good if it is there:
