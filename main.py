@@ -90,7 +90,7 @@ print(tempo)
 
 
 
-# Keyboard visual
+# Visual
 octave = np.array([1,0,1,0,1,1,0,1,0,1,0,1])
 full = np.tile(octave, 11)[:128]
 keyboard = full[start:end]
@@ -121,19 +121,36 @@ for note in range(end-start):
         ]
 print(notes)
 
+pressed = np.full((128), -1, dtype=np.int8)
+
+def dimensions(n):
+    return notes[n-start][0:2]
+
+def color(n):
+    return [
+        [255,127,0],
+        [0,127,255],
+        [255,255,255],
+        [31,31,31]
+    ][n]
+
 keyboardimage = np.zeros((height, width, 3), dtype=np.uint8)
-for note in notes[notes[:,2].argsort()][::-1]:
+for idx, note in enumerate(notes[notes[:,2].argsort()][::-1]):
     if note[2] == 1:
-        keyboardimage[-keyboardheight:-1, note[0]+2:note[1]-2] = [255,255,255]
+        keyboardimage[-keyboardheight:-1, note[0]+2:note[1]-2
+        ] = color(pressed[idx+start]) if pressed[idx+start] != -1 else color(-2)
     if note[2] == 0:
-        keyboardimage[-keyboardheight:-round((3*keyboardheight)/7), note[0]+1:note[1]-1] = [31,31,31]
+        keyboardimage[-keyboardheight:-round((3*keyboardheight)/7), note[0]+1:note[1]-1
+        ] = color(pressed[idx+start]) if pressed[idx+start] != -1 else color(-1)
 
 
 # Notes
 
-def dimensions(n):
-    return notes[n-start][0:1]
+
+
 
 copyimg = np.copy(keyboardimage)
 img = Image.fromarray(copyimg, 'RGB')
 img.save(outputname)
+
+print(dimensions(60))
