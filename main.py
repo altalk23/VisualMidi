@@ -117,7 +117,7 @@ for trackidx, track in enumerate(mid.tracks):
 
         if len(tempo) > 1 and time >= tempo[tempoidx+1][1] and tempo[tempoidx+1][1] > 0:
             tempoidx += 1
-
+        print(msg)
         if msg.is_meta:
             if msg.type == 'key_signature':
                 keysignature = msg.key
@@ -128,6 +128,8 @@ for trackidx, track in enumerate(mid.tracks):
         elif msg.type == 'control_change':
             pass # I don't what in earth is this
         elif msg.type == 'program_change':
+            pass # Same for this
+        elif msg.type == 'pitchwheel':
             pass # Same for this
         elif msg.type == 'note_on' and msg.velocity > 0:
             data[trackidx][idx] = [time, msg.note, msg.velocity, 0]
