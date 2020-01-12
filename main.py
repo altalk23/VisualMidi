@@ -5,7 +5,7 @@ import argparse
 from heapq import heappush, heappop
 import os
 from cv2 import imread, VideoWriter, destroyAllWindows, VideoWriter_fourcc
-from moviepy.editor import VideoFileClip
+from moviepy.editor import ImageClip, concatenate, AudioFileClip
 
 
 
@@ -25,6 +25,7 @@ parser.add_argument('-S', '--speed', type=int, default=1, help='playback speed')
 parser.add_argument('-t', '--track-count', type=int, default=16, help='max track count')
 parser.add_argument('-m', '--max-note', type=int, default=1000, help='max note count, because i am lazy to measure')
 parser.add_argument('-M', '--max-tempo', type=int, default=16, help='max tempo count, because i am lazy to measure')
+parser.add_argument('-f', '--fps', type=int, default=24, help='frames per second')
 
 
 args = parser.parse_args()
@@ -36,7 +37,8 @@ start, end = args.start, args.end+1
 keyboardheight = args.keyboard_height
 stretch = args.stretch * 960000000
 outputname = args.output
-speed = args.speed * 20000000 #480000000/24 1 second constant / 24 frame per second
+fps = args.fps
+speed = args.speed * (480000000 / fps) #480000000/24 1 second constant / 24 frame per second
 trackcount, maxnote = args.track_count, args.max_note
 maxtempo = args.max_tempo
 
@@ -54,7 +56,7 @@ time = 0
 idx = 0
 # meta messages
 for msg in mid.tracks[0]:
-    print(msg)
+    #print(msg)
     if idx == 0:
         time += msg.time
     else:
@@ -221,7 +223,18 @@ while finished:
     curr += speed
     print(int(curr/speed))
 
+'''for filename in directory:
+      if filename.endswith(".png"):
+        clips.append(ImageClip(filename).set_duration(1))'''
 images = [img for img in os.listdir('out') if img.endswith(".png")]
+images.sort()
+clips = [ImageClip('out/'+img).set_duration(1/24) for img in images]
+
+video = concatenate(clips, method="compose")
+video2 = video.set_audio(AudioFileClip(audioname).set_duration(video.duration))
+video2.write_videofile(outputname, fps=fps)
+
+'''images = [img for img in os.listdir('out') if img.endswith(".png")]
 images.sort()
 video = VideoWriter('out/0.mp4', 0x7634706d, 24, (width,height))
 for image in images:
@@ -231,3 +244,4 @@ video.release()
 
 outvideo = VideoFileClip('out/0.mp4')
 outvideo.write_videofile(outputname, audio=audioname)
+'''
