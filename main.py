@@ -29,7 +29,7 @@ parser.add_argument('-m', '--max-note', type=int, default=1000, help='max note c
 parser.add_argument('-M', '--max-tempo', type=int, default=16, help='max tempo count, because i am lazy to measure')
 parser.add_argument('-f', '--fps', type=int, default=24, help='frames per second')
 parser.add_argument('-c', '--config', type=str, help='config file')
-parser.add_argument('-F', '--save-frames', action="store_true", help='save frames as image file')
+parser.add_argument('-F', '--save-frames', action="store_true", help='save frames as image file — not recommended, it takes whole lot of time to write')
 
 
 args = parser.parse_args()
@@ -54,7 +54,18 @@ if args.config is not None:
     with open("data.yaml", 'r') as stream:
         config = yaml.safe_load(stream)
         colors = config['colors']
-
+else:
+    colors = [
+        [255,127,0],
+        [0,127,255],
+        [255,0,0],
+        [0,0,255],
+        [255,0,255],
+        [127,0,255],
+        [255,0,127],
+        [255,255,255],
+        [31,31,31]
+    ]
 # Midi
 
 data = np.zeros((trackcount, maxnote, 4), dtype=np.uint64)
@@ -171,29 +182,9 @@ def noteheight(s, e, curr):
         int(windowheight-min((e-curr)/speed, stretch/speed) * (windowheight * speed / stretch))
     )
 
-def color(n):
-    return [
-        [255,127,0],
-        [0,127,255],
-        [255,0,0],
-        [0,0,255],
-        [255,0,255],
-        [127,0,255],
-        [255,0,127],
-        [255,255,255],
-        [31,31,31]
-    ][n]
+
 
 pressed = np.full((128), -1, dtype=np.int8)
-
-def drawkeyboard(frameimage):
-    for note in notes[notes[:,2].argsort()][::-1]:
-        if note[2] == 1:
-            frameimage[-keyboardheight:-1, note[0]+2:note[1]-2
-            ] = color(pressed[note[3]]) if pressed[note[3]] != -1 else color(-2)
-        if note[2] == 0:
-            frameimage[-keyboardheight:-round((3*keyboardheight)/7), note[0]+1:note[1]-1
-            ] = color(pressed[note[3]]) if pressed[note[3]] != -1 else color(-1)
 
 
 # Notes
@@ -205,13 +196,10 @@ cont = np.full((maxcont,2), -1, dtype=np.int8)
 finished = True
 curr = 0
 seen = []
-os.system('rm -rf out ; mkdir out')
 
 bar = IncrementalBar('Frames: ', max=int(maxtime/speed)+2, suffix='%(index)d / %(max)d', width=os.get_terminal_size()[0]-30)
 
-frameimage = np.zeros((height, width, 3), dtype=np.uint8)
-drawkeyboard(frameimage)
-Image.fromarray(frameimage, 'RGB').save('out/base.png')
+
 
 clips = []
 
@@ -228,18 +216,25 @@ for curr in range(0, int(maxtime) + 2 * int(speed), int(speed)):
                 pressed[track[idx[trackidx][1]][1]] = trackidx
             idx[trackidx][1]+=1
     # remove past notes
+    
     while len(seen) > 0 and seen[0][0] < curr:
         pressed[seen[0][2]] = -1
         heappop(seen)
 
     # test draw
     frameimage = np.zeros((height, width, 3), dtype=np.uint8)
-    drawkeyboard(frameimage)
+    for note in notes[notes[:,2].argsort()][::-1]:
+        if note[2] == 1:
+            frameimage[-keyboardheight:-1, note[0]+2:note[1]-2
+            ] = colors[pressed[note[3]]] if pressed[note[3]] != -1 else colors[-2]
+        if note[2] == 0:
+            frameimage[-keyboardheight:-round((3*keyboardheight)/7), note[0]+1:note[1]-1
+            ] = colors[pressed[note[3]]] if pressed[note[3]] != -1 else colors[-1]
 
     for s in seen:
         h = noteheight(s[1], s[0], curr)
         w = notewidth(s[2])
-        frameimage[h[1]:h[0], w[0]:w[1]] = color(s[3])
+        frameimage[h[1]:h[0], w[0]:w[1]] = colors[s[3]]
 
 
     if saveframes:
@@ -251,11 +246,11 @@ for curr in range(0, int(maxtime) + 2 * int(speed), int(speed)):
     bar.next()
 bar.finish()
 
-# Writing the video
 
+# Writing the video
 
 video = concatenate(clips, method="compose")
 audio = AudioFileClip(audioname)
-video = concatenate_videoclips([video, ImageClip('out/base.png').set_duration(audio.duration - video.duration)])
+video = concatenate_videoclips([video, ImageClip(frameimage).set_duration(audio.duration - video.duration)])
 video = video.set_audio(audio)
 video.write_videofile(outputname, fps=fps)
