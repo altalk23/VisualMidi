@@ -14,5 +14,5 @@ Okay, enough weird things. So I am doing this because I couldn't find a good mid
 - [ ] Writing tempo, duration, key signature, etc.  
 - [ ] Adding background  
 - [ ] Making better visuals  
-- [ ] Adding background music  
-- [ ] Config file
+- [x] Adding background music  
+- [x] Config file
