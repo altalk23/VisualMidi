@@ -45,6 +45,7 @@ fps = args.fps
 speed = args.speed * (480000000 / fps) #480000000/24 1 second constant / 24 frame per second
 trackcount, maxnote = args.track_count, args.max_note
 maxtempo = args.max_tempo
+saveframes = args.save_frames
 
 # Config
 
@@ -208,6 +209,11 @@ os.system('rm -rf out ; mkdir out')
 
 bar = IncrementalBar('Frames: ', max=int(maxtime/speed)+2, suffix='%(index)d / %(max)d', width=os.get_terminal_size()[0]-30)
 
+frameimage = np.zeros((height, width, 3), dtype=np.uint8)
+drawkeyboard(frameimage)
+Image.fromarray(frameimage, 'RGB').save('out/base.png')
+
+clips = []
 
 for curr in range(0, int(maxtime) + 2 * int(speed), int(speed)):
     # add incoming notes
@@ -236,20 +242,20 @@ for curr in range(0, int(maxtime) + 2 * int(speed), int(speed)):
         frameimage[h[1]:h[0], w[0]:w[1]] = color(s[3])
 
 
+    if saveframes:
+        img = Image.fromarray(frameimage, 'RGB')
+        img.save('out/%06d.png' % (int(curr/speed)))
 
-    img = Image.fromarray(frameimage, 'RGB')
-    img.save('out/%06d.png' % (int(curr/speed)))
+    clips.append(ImageClip(frameimage).set_duration(1/fps))
 
     bar.next()
 bar.finish()
 
 # Writing the video
-images = [img for img in os.listdir('out') if img.endswith(".png")]
-images.sort()
-clips = [ImageClip('out/'+img).set_duration(1/fps) for img in images]
+
 
 video = concatenate(clips, method="compose")
 audio = AudioFileClip(audioname)
-video = concatenate_videoclips([video, ImageClip('out/%06d.png' % (int(maxtime/speed)+1)).set_duration(audio.duration - video.duration)])
+video = concatenate_videoclips([video, ImageClip('out/base.png').set_duration(audio.duration - video.duration)])
 video = video.set_audio(audio)
 video.write_videofile(outputname, fps=fps)
