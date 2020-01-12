@@ -200,6 +200,10 @@ pressed = [[] for _ in range(128)]
 
 clips = []
 
+if saveframes: os.system('rm -rf out > /dev/null ; mkdir out')
+
+
+frameimage = np.zeros((height, width, 3), dtype=np.uint8)
 for curr in range(0, int(maxtime) + 2 * int(speed), int(speed)):
     # add incoming notes
     for trackidx, track in enumerate(data):
@@ -235,7 +239,7 @@ for curr in range(0, int(maxtime) + 2 * int(speed), int(speed)):
             int(windowheight-min((s[0]-curr)/speed, stretch/speed) * (windowheight * speed / stretch))
         )
         w = notes[int(s[2]-start)][0:2]
-        frameimage[h[1]+1:h[0]-1, w[0]+1:w[1]-1] = colors[s[3]]
+        frameimage[h[1]+1:max(h[0]-1, 0), w[0]+1:w[1]-1] = colors[s[3]]
 
 
     if saveframes:
