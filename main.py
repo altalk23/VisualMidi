@@ -11,6 +11,7 @@ from datetime import timedelta
 from sys import getsizeof
 from collections import Mapping, Container
 from queue import Queue
+from bisect import insort_left
 
 
 # Arguments
@@ -32,7 +33,8 @@ parser.add_argument('-M', '--max-tempo', type=int, default=16, help='max tempo c
 parser.add_argument('-f', '--fps', type=int, default=24, help='frames per second')
 parser.add_argument('-c', '--config', type=str, help='config file')
 parser.add_argument('-F', '--save-frames', action="store_true", help='save frames as image file — not recommended, it takes whole lot of time to write')
-parser.add_argument('-fn', '--font-name', default="Courier Prime Code.ttf", help='font file to use')
+parser.add_argument('-fn', '--font-name', type=str, default="Courier Prime Code.ttf", help='font file to use')
+parser.add_argument('-r', '--recycle-rate', type=int, default=96, help='frame count to write')
 
 
 args = parser.parse_args()
@@ -50,12 +52,13 @@ trackcount, maxnote = args.track_count, args.max_note
 maxtempo = args.max_tempo
 saveframes = args.save_frames
 fontname = args.font_name
+recyclerate = args.recycle_rate
 
 # Config
 
 if args.config is not None:
     # Read YAML file
-    with open("data.yaml", 'r') as stream:
+    with open(args.config, 'r') as stream:
         config = yaml.safe_load(stream)
         colors = config['colors']
 else:
@@ -71,7 +74,6 @@ else:
         [31,31,31]
     ]
 # Midi
-
 data = np.zeros((trackcount, maxnote, 4), dtype=np.uint64)
 cont = [Queue(maxsize=20) for _ in range(128)]
 
@@ -200,7 +202,7 @@ pressed = [[] for _ in range(128)]
 clips = []
 
 if saveframes: os.system('rm -rf out > /dev/null ; mkdir out')
-
+os.system('rm -rf mem > /dev/null ; mkdir mem')
 
 
 tempoidx = 0
@@ -214,7 +216,8 @@ for curr in range(0, int(maxtime + 2 * speed), int(speed)):
         while idx[trackidx][0] < maxnote and track[idx[trackidx][0]][0] < stretch + curr :
             if track[idx[trackidx][0]][3] != 0:
                 #print("pushing {0}".format((track[idx[trackidx][0]][3], track[idx[trackidx][0]][0], track[idx[trackidx][0]][1], trackidx)))
-                heappush(seen, (track[idx[trackidx][0]][3], track[idx[trackidx][0]][0], track[idx[trackidx][0]][1], trackidx))
+                insort_left(seen, (track[idx[trackidx][0]][3], track[idx[trackidx][0]][0], track[idx[trackidx][0]][1], trackidx))
+                #heappush(seen, (track[idx[trackidx][0]][3], track[idx[trackidx][0]][0], track[idx[trackidx][0]][1], trackidx))
             idx[trackidx][0]+=1
 
         while idx[trackidx][1] < maxnote and track[idx[trackidx][1]][0] < curr :
@@ -226,7 +229,8 @@ for curr in range(0, int(maxtime + 2 * speed), int(speed)):
     while len(seen) > 0 and seen[0][0] < curr:
         #print("popping {0}".format(seen[0]))
         pressed[seen[0][2]].pop()
-        heappop(seen)
+        seen = seen[1:]
+        #heappop(seen)
 
     # test draw
     frameimage = np.zeros((height, width, 3), dtype=np.uint8)
@@ -238,7 +242,7 @@ for curr in range(0, int(maxtime + 2 * speed), int(speed)):
             frameimage[-keyboardheight:-round((3*keyboardheight)/7), note[0]+1:note[1]-1
             ] = colors[pressed[note[3]][0]] if len(pressed[note[3]]) > 0 else colors[-1]
 
-
+    #print(seen)
     for s in seen:
         h = (
             int(windowheight-max((s[1]-curr)/speed, 0) * (windowheight * speed / stretch)),
@@ -261,16 +265,20 @@ for curr in range(0, int(maxtime + 2 * speed), int(speed)):
 
     if saveframes: img.save('out/%06d.png' % (int(curr/speed)))
 
-    if frameidx % (fps * 4) == (fps * 4 - 1): #write
+    if frameidx % recyclerate == recyclerate - 1: #write
         video = concatenate(clips, method="compose")
-        video.write_videofile('mem/%06d.mp4' % (frameidx), fps=fps)
+        video.write_videofile('mem/%06d.mp4' % (frameidx), fps=fps, verbose=False, logger=None)
+        clips = None
+        del clips
         clips = []
         video = None
         del video
     else:
         clips.append(ImageClip(frameimage).set_duration(1/fps))
-    frameimage = None
-    del frameimage
+
+    if frameidx <= int(maxtime/speed):
+        frameimage = None
+        del frameimage
 
     bar.next()
     frameidx += 1
@@ -280,13 +288,17 @@ bar.finish()
 
 
 # Writing the video
-
-video = concatenate(clips, method="compose")
+if (frameidx % recyclerate != 0):
+    video = concatenate(clips, method="compose")
 audio = AudioFileClip(audioname)
-subvideos = [sub for sub in os.listdir('mem') if sub.endswith(".mp4")]
-subvideos.sort()
-clips = [VideoFileClip('mem/'+sub) for sub in subvideos]
-video = concatenate_videoclips(clips + [video])
+if frameidx > recyclerate:
+    subvideos = [sub for sub in os.listdir('mem') if sub.endswith(".mp4")]
+    subvideos.sort()
+    clips = [VideoFileClip('mem/'+sub) for sub in subvideos]
+    if (frameidx % recyclerate != 0):
+        video = concatenate_videoclips(clips + [video])
+    else:
+        video = concatenate_videoclips(clips)
 video = concatenate_videoclips([video, ImageClip(frameimage).set_duration(audio.duration - video.duration)])
 video = video.set_audio(audio)
 video.write_videofile(outputname, fps=fps)
