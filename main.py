@@ -132,6 +132,9 @@ for trackidx, track in enumerate(mid.tracks):
             idx += 1
 
         elif msg.type == 'note_off' or msg.velocity == 0:
+            if trackidx == 4:
+                print(msg)
+                print(time)
             data[trackidx][cont[msg.note]][3] = time
             cont[msg.note] = -1
 
@@ -206,14 +209,20 @@ clips = []
 
 if saveframes: os.system('rm -rf out > /dev/null ; mkdir out')
 
+for d in data[4]:
+    print(d)
+
 tempoidx = 0
 for curr in range(0, int(maxtime + 2 * speed), int(speed)):
+    #print(pressed)
+    #print('')
     frameimage = np.zeros((height, width, 3), dtype=np.uint8)
     if curr > tempo[tempoidx+1][1] and tempo[tempoidx+1][1] > 0: tempoidx += 1
     # add incoming notes
     for trackidx, track in enumerate(data):
         while idx[trackidx][0] < maxnote and track[idx[trackidx][0]][0] < stretch + curr :
             if track[idx[trackidx][0]][3] != 0:
+                #print("pushing {0}".format((track[idx[trackidx][0]][3], track[idx[trackidx][0]][0], track[idx[trackidx][0]][1], trackidx)))
                 heappush(seen, (track[idx[trackidx][0]][3], track[idx[trackidx][0]][0], track[idx[trackidx][0]][1], trackidx))
             idx[trackidx][0]+=1
 
@@ -224,9 +233,10 @@ for curr in range(0, int(maxtime + 2 * speed), int(speed)):
     # remove past notes
 
     while len(seen) > 0 and seen[0][0] < curr:
+        #print("popping {0}".format(seen[0]))
         pressed[seen[0][2]].pop()
         heappop(seen)
-
+    '''
     # test draw
     frameimage = np.zeros((height, width, 3), dtype=np.uint8)
     for note in notes[notes[:,2].argsort()][::-1]:
@@ -261,9 +271,10 @@ for curr in range(0, int(maxtime + 2 * speed), int(speed)):
     if saveframes: img.save('out/%06d.png' % (int(curr/speed)))
 
     clips.append(ImageClip(frameimage).set_duration(1/fps))
+    '''
     bar.next()
     test += 1
-    if (test == 4265): break
+
 
 bar.finish()
 
