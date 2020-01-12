@@ -4,7 +4,7 @@ from mido import MidiFile, tempo2bpm
 import argparse
 from heapq import heappush, heappop
 import os
-from moviepy.editor import ImageClip, concatenate, AudioFileClip, concatenate_videoclips
+from moviepy.editor import ImageClip, concatenate, AudioFileClip, concatenate_videoclips, VideoFileClip
 import yaml
 from progress.bar import IncrementalBar
 from datetime import timedelta
@@ -179,15 +179,6 @@ for note in range(end-start):
         ]
 
 
-def noteheight(s, e, curr):
-    return (
-        int(windowheight-max((s-curr)/speed, 0) * (windowheight * speed / stretch)),
-        int(windowheight-min((e-curr)/speed, stretch/speed) * (windowheight * speed / stretch))
-    )
-
-
-
-
 
 # Notes
 
@@ -200,7 +191,7 @@ curr = 0
 seen = []
 
 bar = IncrementalBar('Frames: ', max=int(maxtime/speed)+2, suffix='%(index)d / %(max)d', width=os.get_terminal_size()[0]-30)
-test = 0
+frameidx = 0
 
 pressed = np.full((128), -1, dtype=np.int8)
 
@@ -263,17 +254,26 @@ for curr in range(0, int(maxtime + 2 * speed), int(speed)):
     elapsed = timedelta(seconds=min(curr/speed/fps, maxtime/speed/fps))
     endtime = timedelta(seconds=maxtime/speed/fps)
     draw.text((20, 22), "{0} / {1}".format(
-        '%02d:%02d:%02d.%06d' % (elapsed.seconds // 3600, elapsed.seconds // 60 % 60, elapsed.seconds, elapsed.microseconds),
-        '%02d:%02d:%02d.%06d' % (endtime.seconds // 3600, endtime.seconds // 60 % 60, endtime.seconds, endtime.microseconds)
+        '%02d:%02d:%02d.%06d' % (elapsed.seconds // 3600, (elapsed.seconds // 60) % 60, elapsed.seconds, elapsed.microseconds),
+        '%02d:%02d:%02d.%06d' % (endtime.seconds // 3600, (endtime.seconds // 60) % 60, endtime.seconds, endtime.microseconds)
     ),(255,255,255),font=font)
     frameimage = np.array(img)
 
     if saveframes: img.save('out/%06d.png' % (int(curr/speed)))
 
-    clips.append(ImageClip(frameimage).set_duration(1/fps))
-    
+    if frameidx % (fps * 4) == (fps * 4 - 1): #write
+        video = concatenate(clips, method="compose")
+        video.write_videofile('mem/%06d.mp4' % (frameidx), fps=fps)
+        clips = []
+        video = None
+        del video
+    else:
+        clips.append(ImageClip(frameimage).set_duration(1/fps))
+    frameimage = None
+    del frameimage
+
     bar.next()
-    test += 1
+    frameidx += 1
 
 
 bar.finish()
@@ -283,6 +283,10 @@ bar.finish()
 
 video = concatenate(clips, method="compose")
 audio = AudioFileClip(audioname)
+subvideos = [sub for sub in os.listdir('mem') if sub.endswith(".mp4")]
+subvideos.sort()
+clips = [VideoFileClip('mem/'+sub) for sub in subvideos]
+video = concatenate_videoclips(clips + [video])
 video = concatenate_videoclips([video, ImageClip(frameimage).set_duration(audio.duration - video.duration)])
 video = video.set_audio(audio)
 video.write_videofile(outputname, fps=fps)
