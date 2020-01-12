@@ -172,10 +172,6 @@ for note in range(end-start):
         ]
 
 
-def notewidth(n):
-    return notes[int(n-start)][0:2]
-
-windowheight = height-keyboardheight-2
 def noteheight(s, e, curr):
     return (
         int(windowheight-max((s-curr)/speed, 0) * (windowheight * speed / stretch)),
@@ -184,7 +180,6 @@ def noteheight(s, e, curr):
 
 
 
-pressed = np.full((128), -1, dtype=np.int8)
 
 
 # Notes
@@ -192,14 +187,16 @@ pressed = np.full((128), -1, dtype=np.int8)
 maxcont = 200
 idx = np.zeros((trackcount, 2), dtype=np.uint32)
 cont = np.full((maxcont,2), -1, dtype=np.int8)
+windowheight = height-keyboardheight-2
 
-finished = True
 curr = 0
 seen = []
 
 bar = IncrementalBar('Frames: ', max=int(maxtime/speed)+2, suffix='%(index)d / %(max)d', width=os.get_terminal_size()[0]-30)
 
+pressed = np.full((128), -1, dtype=np.int8)
 
+pressed = [[] for _ in range(128)]
 
 clips = []
 
@@ -213,12 +210,12 @@ for curr in range(0, int(maxtime) + 2 * int(speed), int(speed)):
 
         while idx[trackidx][1] < maxnote and track[idx[trackidx][1]][0] < curr :
             if track[idx[trackidx][1]][3] != 0:
-                pressed[track[idx[trackidx][1]][1]] = trackidx
+                pressed[track[idx[trackidx][1]][1]].append(trackidx)
             idx[trackidx][1]+=1
     # remove past notes
-    
+
     while len(seen) > 0 and seen[0][0] < curr:
-        pressed[seen[0][2]] = -1
+        pressed[seen[0][2]].pop()
         heappop(seen)
 
     # test draw
@@ -226,15 +223,19 @@ for curr in range(0, int(maxtime) + 2 * int(speed), int(speed)):
     for note in notes[notes[:,2].argsort()][::-1]:
         if note[2] == 1:
             frameimage[-keyboardheight:-1, note[0]+2:note[1]-2
-            ] = colors[pressed[note[3]]] if pressed[note[3]] != -1 else colors[-2]
+            ] = colors[pressed[note[3]][0]] if len(pressed[note[3]]) > 0 else colors[-2]
         if note[2] == 0:
             frameimage[-keyboardheight:-round((3*keyboardheight)/7), note[0]+1:note[1]-1
-            ] = colors[pressed[note[3]]] if pressed[note[3]] != -1 else colors[-1]
+            ] = colors[pressed[note[3]][0]] if len(pressed[note[3]]) > 0 else colors[-1]
+
 
     for s in seen:
-        h = noteheight(s[1], s[0], curr)
-        w = notewidth(s[2])
-        frameimage[h[1]:h[0], w[0]:w[1]] = colors[s[3]]
+        h = (
+            int(windowheight-max((s[1]-curr)/speed, 0) * (windowheight * speed / stretch)),
+            int(windowheight-min((s[0]-curr)/speed, stretch/speed) * (windowheight * speed / stretch))
+        )
+        w = notes[int(s[2]-start)][0:2]
+        frameimage[h[1]+1:h[0]-1, w[0]+1:w[1]-1] = colors[s[3]]
 
 
     if saveframes:
