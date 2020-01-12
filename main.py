@@ -10,6 +10,7 @@ from progress.bar import IncrementalBar
 from datetime import timedelta
 from sys import getsizeof
 from collections import Mapping, Container
+from queue import Queue
 
 
 # Arguments
@@ -72,7 +73,7 @@ else:
 # Midi
 
 data = np.zeros((trackcount, maxnote, 4), dtype=np.uint64)
-cont = np.full((128), -1, dtype=np.int32)
+cont = [Queue(maxsize=20) for _ in range(128)]
 
 keysignature = ''
 tempo = np.zeros((maxtempo, 2), dtype=np.uint64)
@@ -128,18 +129,18 @@ for trackidx, track in enumerate(mid.tracks):
             pass # Same for this
         elif msg.type == 'note_on' and msg.velocity > 0:
             data[trackidx][idx] = [time, msg.note, msg.velocity, 0]
-            cont[msg.note] = idx
+            cont[msg.note].put(idx)
             idx += 1
 
         elif msg.type == 'note_off' or msg.velocity == 0:
-            if trackidx == 4:
-                print(msg)
-                print(time)
-            data[trackidx][cont[msg.note]][3] = time
-            cont[msg.note] = -1
+
+            data[trackidx][cont[msg.note].get()][3] = time
+
 
 
         maxtime = max(maxtime, time)
+
+
 
     #print('')
 #print(data)
@@ -209,8 +210,7 @@ clips = []
 
 if saveframes: os.system('rm -rf out > /dev/null ; mkdir out')
 
-for d in data[4]:
-    print(d)
+
 
 tempoidx = 0
 for curr in range(0, int(maxtime + 2 * speed), int(speed)):
@@ -236,7 +236,7 @@ for curr in range(0, int(maxtime + 2 * speed), int(speed)):
         #print("popping {0}".format(seen[0]))
         pressed[seen[0][2]].pop()
         heappop(seen)
-    '''
+
     # test draw
     frameimage = np.zeros((height, width, 3), dtype=np.uint8)
     for note in notes[notes[:,2].argsort()][::-1]:
@@ -271,7 +271,7 @@ for curr in range(0, int(maxtime + 2 * speed), int(speed)):
     if saveframes: img.save('out/%06d.png' % (int(curr/speed)))
 
     clips.append(ImageClip(frameimage).set_duration(1/fps))
-    '''
+    
     bar.next()
     test += 1
 
