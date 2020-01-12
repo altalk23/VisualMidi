@@ -7,4 +7,12 @@ Thumbs.db
 
 # ignore out folder
 out/
-out.*
+
+# ignore media
+*.png
+*.mp4
+*.mid
+*.mp3
+
+# don't ignore examples
+!example/
