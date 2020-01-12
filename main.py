@@ -4,8 +4,7 @@ from mido import MidiFile, tempo2bpm
 import argparse
 from heapq import heappush, heappop
 import os
-from cv2 import imread, VideoWriter, destroyAllWindows, VideoWriter_fourcc
-from moviepy.editor import ImageClip, concatenate, AudioFileClip
+from moviepy.editor import ImageClip, concatenate, AudioFileClip, concatenate_videoclips
 
 
 
@@ -185,6 +184,11 @@ curr = 0
 seen = []
 os.system('rm -rf out ; mkdir out')
 
+frameimage = np.zeros((height, width, 3), dtype=np.uint8)
+drawkeyboard(frameimage)
+Image.fromarray(frameimage, 'RGB').save('base.png')
+
+
 while finished:
     # add incoming notes
     for trackidx, track in enumerate(data):
@@ -223,25 +227,14 @@ while finished:
     curr += speed
     print(int(curr/speed))
 
-'''for filename in directory:
-      if filename.endswith(".png"):
-        clips.append(ImageClip(filename).set_duration(1))'''
+
+# Writing the video
 images = [img for img in os.listdir('out') if img.endswith(".png")]
 images.sort()
-clips = [ImageClip('out/'+img).set_duration(1/24) for img in images]
+clips = [ImageClip('out/'+img).set_duration(1/fps) for img in images]
 
 video = concatenate(clips, method="compose")
-video2 = video.set_audio(AudioFileClip(audioname).set_duration(video.duration))
-video2.write_videofile(outputname, fps=fps)
-
-'''images = [img for img in os.listdir('out') if img.endswith(".png")]
-images.sort()
-video = VideoWriter('out/0.mp4', 0x7634706d, 24, (width,height))
-for image in images:
-    video.write(imread(os.path.join('out', image)))
-destroyAllWindows()
-video.release()
-
-outvideo = VideoFileClip('out/0.mp4')
-outvideo.write_videofile(outputname, audio=audioname)
-'''
+audio = AudioFileClip(audioname)
+video = concatenate_videoclips([video, ImageClip('base.png').set_duration(audio.duration - video.duration)])
+video = video.set_audio(audio)
+video.write_videofile(outputname, fps=fps)
