@@ -5,6 +5,7 @@ import argparse
 from heapq import heappush, heappop
 import os
 from moviepy.editor import ImageClip, concatenate, AudioFileClip, concatenate_videoclips
+import yaml
 
 
 
@@ -25,6 +26,7 @@ parser.add_argument('-t', '--track-count', type=int, default=16, help='max track
 parser.add_argument('-m', '--max-note', type=int, default=1000, help='max note count, because i am lazy to measure')
 parser.add_argument('-M', '--max-tempo', type=int, default=16, help='max tempo count, because i am lazy to measure')
 parser.add_argument('-f', '--fps', type=int, default=24, help='frames per second')
+parser.add_argument('-c', '--config', type=str, help='config file')
 
 
 args = parser.parse_args()
@@ -41,6 +43,14 @@ speed = args.speed * (480000000 / fps) #480000000/24 1 second constant / 24 fram
 trackcount, maxnote = args.track_count, args.max_note
 maxtempo = args.max_tempo
 
+# Config
+
+if args.config is not None:
+    # Read YAML file
+    with open("data.yaml", 'r') as stream:
+        config = yaml.safe_load(stream)
+        colors = config['colors']
+
 # Midi
 
 data = np.zeros((trackcount, maxnote, 4), dtype=np.uint64)
@@ -50,13 +60,12 @@ keysignature = ''
 tempo = np.zeros((maxtempo, 2), dtype=np.uint64)
 
 
-
+'''
 time = 0
-idx = 0
 # meta messages
 for msg in mid.tracks[0]:
     #print(msg)
-    if idx == 0:
+    if metaidx == 0:
         time += msg.time
     else:
         time += msg.time * tempo[idx-1][0]
@@ -65,34 +74,54 @@ for msg in mid.tracks[0]:
         keysignature = msg.key
 
     elif msg.type == 'set_tempo':
-        tempo[idx] = [msg.tempo,time]
-        idx += 1
-
+        tempo[metaidx] = [msg.tempo,time]
+        metaidx += 1
+'''
 
 maxtime = 0
 
 # track data
-for trackidx, track in enumerate(mid.tracks[1:]):
-    #print('Track {}: {}'.format(trackidx, track.name))
+for trackidx, track in enumerate(mid.tracks):
+    print('Track {}: {}'.format(trackidx, track.name))
+    metaidx = 0
     time = 0
     idx = 0
     tempoidx = 0
 
-    # using note on note off for now — well logic pro exports like that
+    # musescore?
     for msg in track:
-        #print(msg)
-        time += msg.time * tempo[tempoidx][0]
-        if time >= tempo[tempoidx+1][1] and tempo[tempoidx+1][1] > 0:
+        print(msg)
+
+
+
+        if len(tempo) > 0:
+            time += msg.time * tempo[tempoidx][0]
+
+        if len(tempo) > 1 and time >= tempo[tempoidx+1][1] and tempo[tempoidx+1][1] > 0:
             tempoidx += 1
 
-        if msg.type == 'note_on':
+        if msg.is_meta:
+            if msg.type == 'key_signature':
+                keysignature = msg.key
+
+            elif msg.type == 'set_tempo':
+                tempo[metaidx] = [msg.tempo,time]
+                metaidx += 1
+            print(tempo)
+        elif msg.type == 'control_change':
+            pass # I don't what in earth is this
+        elif msg.type == 'program_change':
+            pass # Same for this
+        elif msg.type == 'note_on' and msg.velocity > 0:
             data[trackidx][idx] = [time, msg.note, msg.velocity, 0]
             cont[msg.note] = idx
             idx += 1
 
-        elif msg.type == 'note_off':
+        elif msg.type == 'note_off' or msg.velocity == 0:
             data[trackidx][cont[msg.note]][3] = time
             cont[msg.note] = -1
+
+
         maxtime = max(maxtime, time)
 
     #print('')
@@ -168,11 +197,6 @@ def drawkeyboard(frameimage):
             ] = color(pressed[note[3]]) if pressed[note[3]] != -1 else color(-1)
 
 
-'''
-copyimg = np.copy(keyboardimage)
-img = Image.fromarray(copyimg, 'RGB')
-img.save(outputname)
-'''
 # Notes
 
 maxcont = 200
@@ -221,7 +245,7 @@ while finished:
     if curr > maxtime: break
 
     img = Image.fromarray(frameimage, 'RGB')
-    img.save('out/%04d.png' % (int(curr/speed)))
+    img.save('out/%06d.png' % (int(curr/speed)))
 
     #next
     curr += speed
