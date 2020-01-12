@@ -1,4 +1,4 @@
-from PIL import Image
+from PIL import Image, ImageFont, ImageDraw
 import numpy as np
 from mido import MidiFile, tempo2bpm
 import argparse
@@ -7,8 +7,9 @@ import os
 from moviepy.editor import ImageClip, concatenate, AudioFileClip, concatenate_videoclips
 import yaml
 from progress.bar import IncrementalBar
-
-
+from datetime import timedelta
+from sys import getsizeof
+from collections import Mapping, Container
 
 
 # Arguments
@@ -30,6 +31,7 @@ parser.add_argument('-M', '--max-tempo', type=int, default=16, help='max tempo c
 parser.add_argument('-f', '--fps', type=int, default=24, help='frames per second')
 parser.add_argument('-c', '--config', type=str, help='config file')
 parser.add_argument('-F', '--save-frames', action="store_true", help='save frames as image file — not recommended, it takes whole lot of time to write')
+parser.add_argument('-fn', '--font-name', default="Courier Prime Code.ttf", help='font file to use')
 
 
 args = parser.parse_args()
@@ -46,6 +48,7 @@ speed = args.speed * (480000000 / fps) #480000000/24 1 second constant / 24 fram
 trackcount, maxnote = args.track_count, args.max_note
 maxtempo = args.max_tempo
 saveframes = args.save_frames
+fontname = args.font_name
 
 # Config
 
@@ -193,6 +196,7 @@ curr = 0
 seen = []
 
 bar = IncrementalBar('Frames: ', max=int(maxtime/speed)+2, suffix='%(index)d / %(max)d', width=os.get_terminal_size()[0]-30)
+test = 0
 
 pressed = np.full((128), -1, dtype=np.int8)
 
@@ -202,9 +206,10 @@ clips = []
 
 if saveframes: os.system('rm -rf out > /dev/null ; mkdir out')
 
-
-frameimage = np.zeros((height, width, 3), dtype=np.uint8)
-for curr in range(0, int(maxtime) + 2 * int(speed), int(speed)):
+tempoidx = 0
+for curr in range(0, int(maxtime + 2 * speed), int(speed)):
+    frameimage = np.zeros((height, width, 3), dtype=np.uint8)
+    if curr > tempo[tempoidx+1][1] and tempo[tempoidx+1][1] > 0: tempoidx += 1
     # add incoming notes
     for trackidx, track in enumerate(data):
         while idx[trackidx][0] < maxnote and track[idx[trackidx][0]][0] < stretch + curr :
@@ -241,14 +246,25 @@ for curr in range(0, int(maxtime) + 2 * int(speed), int(speed)):
         w = notes[int(s[2]-start)][0:2]
         frameimage[h[1]+1:max(h[0]-1, 0), w[0]+1:w[1]-1] = colors[s[3]]
 
+    img = Image.fromarray(frameimage, 'RGB')
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.truetype(fontname, 32)
+    draw.text((20, windowheight - 54), "Key Signature: {0}, Tempo: {1}".format(keysignature, tempo2bpm(tempo[tempoidx][0])),(255,255,255),font=font)
+    elapsed = timedelta(seconds=min(curr/speed/fps, maxtime/speed/fps))
+    endtime = timedelta(seconds=maxtime/speed/fps)
+    draw.text((20, 22), "{0} / {1}".format(
+        '%02d:%02d:%02d.%06d' % (elapsed.seconds // 3600, elapsed.seconds // 60 % 60, elapsed.seconds, elapsed.microseconds),
+        '%02d:%02d:%02d.%06d' % (endtime.seconds // 3600, endtime.seconds // 60 % 60, endtime.seconds, endtime.microseconds)
+    ),(255,255,255),font=font)
+    frameimage = np.array(img)
 
-    if saveframes:
-        img = Image.fromarray(frameimage, 'RGB')
-        img.save('out/%06d.png' % (int(curr/speed)))
+    if saveframes: img.save('out/%06d.png' % (int(curr/speed)))
 
     clips.append(ImageClip(frameimage).set_duration(1/fps))
-
     bar.next()
+    test += 1
+    if (test == 4265): break
+
 bar.finish()
 
 
