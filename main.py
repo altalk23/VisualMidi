@@ -6,6 +6,8 @@ from heapq import heappush, heappop
 import os
 from moviepy.editor import ImageClip, concatenate, AudioFileClip, concatenate_videoclips
 import yaml
+from progress.bar import IncrementalBar
+
 
 
 
@@ -27,6 +29,7 @@ parser.add_argument('-m', '--max-note', type=int, default=1000, help='max note c
 parser.add_argument('-M', '--max-tempo', type=int, default=16, help='max tempo count, because i am lazy to measure')
 parser.add_argument('-f', '--fps', type=int, default=24, help='frames per second')
 parser.add_argument('-c', '--config', type=str, help='config file')
+parser.add_argument('-F', '--save-frames', action="store_true", help='save frames as image file')
 
 
 args = parser.parse_args()
@@ -82,7 +85,6 @@ maxtime = 0
 
 # track data
 for trackidx, track in enumerate(mid.tracks):
-    print('Track {}: {}'.format(trackidx, track.name))
     metaidx = 0
     time = 0
     idx = 0
@@ -90,8 +92,6 @@ for trackidx, track in enumerate(mid.tracks):
 
     # musescore?
     for msg in track:
-        print(msg)
-
 
 
         if len(tempo) > 0:
@@ -107,7 +107,6 @@ for trackidx, track in enumerate(mid.tracks):
             elif msg.type == 'set_tempo':
                 tempo[metaidx] = [msg.tempo,time]
                 metaidx += 1
-            print(tempo)
         elif msg.type == 'control_change':
             pass # I don't what in earth is this
         elif msg.type == 'program_change':
@@ -127,7 +126,6 @@ for trackidx, track in enumerate(mid.tracks):
     #print('')
 #print(data)
 #print(tempo)
-
 
 
 
@@ -208,12 +206,10 @@ curr = 0
 seen = []
 os.system('rm -rf out ; mkdir out')
 
-frameimage = np.zeros((height, width, 3), dtype=np.uint8)
-drawkeyboard(frameimage)
-Image.fromarray(frameimage, 'RGB').save('base.png')
+bar = IncrementalBar('Frames: ', max=int(maxtime/speed)+2, suffix='%(index)d / %(max)d', width=os.get_terminal_size()[0]-30)
 
 
-while finished:
+for curr in range(0, int(maxtime) + 2 * int(speed), int(speed)):
     # add incoming notes
     for trackidx, track in enumerate(data):
         while idx[trackidx][0] < maxnote and track[idx[trackidx][0]][0] < stretch + curr :
@@ -241,16 +237,11 @@ while finished:
 
 
 
-    # end
-    if curr > maxtime: break
-
     img = Image.fromarray(frameimage, 'RGB')
     img.save('out/%06d.png' % (int(curr/speed)))
 
-    #next
-    curr += speed
-    print(int(curr/speed))
-
+    bar.next()
+bar.finish()
 
 # Writing the video
 images = [img for img in os.listdir('out') if img.endswith(".png")]
@@ -259,6 +250,6 @@ clips = [ImageClip('out/'+img).set_duration(1/fps) for img in images]
 
 video = concatenate(clips, method="compose")
 audio = AudioFileClip(audioname)
-video = concatenate_videoclips([video, ImageClip('base.png').set_duration(audio.duration - video.duration)])
+video = concatenate_videoclips([video, ImageClip('out/%06d.png' % (int(maxtime/speed)+1)).set_duration(audio.duration - video.duration)])
 video = video.set_audio(audio)
 video.write_videofile(outputname, fps=fps)
