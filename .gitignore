@@ -9,10 +9,7 @@ Thumbs.db
 out/
 
 # ignore media
-*.png
-*.mp4
-*.mid
-*.mp3
+media/
 
 # don't ignore examples
 !example/
