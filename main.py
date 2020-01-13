@@ -208,47 +208,54 @@ os.system('rm -rf mem > /dev/null ; mkdir mem')
 
 
 tempoidx = 0
-for curr in range(0, int(maxtime + 2 * speed), int(speed)):
+for curr in range(0, int(maxtime + 3 * speed), int(speed)):
     #print(pressed)
     #print('')
     frameimage = np.zeros((height, width, 3), dtype=np.uint8)
     if curr > tempo[tempoidx+1][1] and tempo[tempoidx+1][1] > 0: tempoidx += 1
     # add incoming notes
+    print(seen)
+    print(pressed)
     for trackidx, track in enumerate(data):
         while idx[trackidx][0] < maxnote and track[idx[trackidx][0]][0] < stretch + curr :
             if track[idx[trackidx][0]][3] != 0:
                 #print("pushing {0}".format((track[idx[trackidx][0]][3], track[idx[trackidx][0]][0], track[idx[trackidx][0]][1], trackidx)))
-                insort_left(seen, (track[idx[trackidx][0]][3], track[idx[trackidx][0]][0], track[idx[trackidx][0]][1], trackidx))
+                insort_left(seen, (track[idx[trackidx][0]][0], track[idx[trackidx][0]][3], track[idx[trackidx][0]][1], trackidx))
                 #heappush(seen, (track[idx[trackidx][0]][3], track[idx[trackidx][0]][0], track[idx[trackidx][0]][1], trackidx))
             idx[trackidx][0]+=1
 
-        while idx[trackidx][1] < maxnote and track[idx[trackidx][1]][0] < curr :
-            if track[idx[trackidx][1]][3] != 0:
-                pressed[track[idx[trackidx][1]][1]].append(trackidx)
-            idx[trackidx][1]+=1
-    # remove past notes
+    pressed = [[] for _ in range(128)]
+    pressedidx = 0
+    for s in seen:
+        if s[0] <= curr:
+            pressed[s[2]].append(s[3])
+        else: break
+        pressedidx+=1
 
-    while len(seen) > 0 and seen[0][0] < curr:
-        #print("popping {0}".format(seen[0]))
-        pressed[seen[0][2]].pop()
-        seen = seen[1:]
-        #heappop(seen)
+    # remove past notes
+    for i, s in enumerate(seen):
+        if s[1] <= curr:
+            pressed[s[2]].pop()
+    seen = [s for s in seen if s[1] > curr ]
+        #seen = seen[:i] + seen[i+1:]
+
 
     # test draw
     frameimage = np.zeros((height, width, 3), dtype=np.uint8)
     for note in notes[notes[:,2].argsort()][::-1]:
         if note[2] == 1:
             frameimage[-keyboardheight:-1, note[0]+2:note[1]-2
-            ] = colors[pressed[note[3]][0]] if len(pressed[note[3]]) > 0 else colors[-2]
+            ] = colors[pressed[note[3]][-1]] if len(pressed[note[3]]) > 0 else colors[-2]
         if note[2] == 0:
             frameimage[-keyboardheight:-round((3*keyboardheight)/7), note[0]+1:note[1]-1
-            ] = colors[pressed[note[3]][0]] if len(pressed[note[3]]) > 0 else colors[-1]
+            ] = colors[pressed[note[3]][-1]] if len(pressed[note[3]]) > 0 else colors[-1]
 
     #print(seen)
     for s in seen:
+        print(s)
         h = (
-            int(windowheight-max((s[1]-curr)/speed, 0) * (windowheight * speed / stretch)),
-            int(windowheight-min((s[0]-curr)/speed, stretch/speed) * (windowheight * speed / stretch))
+            int(windowheight-max((s[0]-curr)/speed, 0) * (windowheight * speed / stretch)),
+            int(windowheight-min((s[1]-curr)/speed, stretch/speed) * (windowheight * speed / stretch))
         )
         w = notes[int(s[2]-start)][0:2]
         frameimage[h[1]+1:max(h[0]-1, 0), w[0]+1:w[1]-1] = colors[s[3]]
