@@ -117,7 +117,7 @@ for trackidx, track in enumerate(mid.tracks):
 
         if len(tempo) > 1 and time >= tempo[tempoidx+1][1] and tempo[tempoidx+1][1] > 0:
             tempoidx += 1
-        print(msg)
+        #print(msg)
         if msg.is_meta:
             if msg.type == 'key_signature':
                 keysignature = msg.key
@@ -267,6 +267,7 @@ for curr in range(0, int(maxtime + 2 * speed), int(speed)):
 
     if saveframes: img.save('out/%06d.png' % (int(curr/speed)))
 
+    clips.append(ImageClip(frameimage).set_duration(1/fps))
     if frameidx % recyclerate == recyclerate - 1: #write
         video = concatenate(clips, method="compose")
         video.write_videofile('mem/%06d.mp4' % (frameidx), fps=fps, verbose=False, logger=None)
@@ -275,8 +276,7 @@ for curr in range(0, int(maxtime + 2 * speed), int(speed)):
         clips = []
         video = None
         del video
-    else:
-        clips.append(ImageClip(frameimage).set_duration(1/fps))
+
 
     if frameidx <= int(maxtime/speed):
         frameimage = None
