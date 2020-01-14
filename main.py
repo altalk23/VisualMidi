@@ -90,6 +90,10 @@ for msg, trck in messages:
     relmessages.append((msg.copy(time=delta), trck))
     now = msg.time
 
+idx = -1
+while relmessages[idx][0].is_meta: idx -= 1
+relmessages = relmessages[:idx+1]
+
 data = np.zeros((maxnote, 5), dtype=np.uint64)
 cont = [[Queue(maxsize=20) for _ in range(128)] for _ in range(trackcount)]
 tempolist = []
@@ -101,16 +105,13 @@ idx = 0
 tempoidx = 0
 delta = 0
 for msg, trck in relmessages:
-
-
-
     if msg.time > 0:
         delta = msg.time * tempo
     else:
         delta = 0
 
     time += delta
-
+    print(time, msg)
     if msg.is_meta:
         if msg.type == 'key_signature':
             keysignature = msg.key
@@ -133,10 +134,8 @@ for msg, trck in relmessages:
         data[cont[trck][msg.note].get()][1] = time
     maxtime = max(maxtime, time)
 
-'''
 for msg in data:
     print(msg[0], '\t', msg[1], '\t', msg[2], '\t', msg[3], '\t', msg[4])
-'''
 
 # Visual
 octave = np.array([1,0,1,0,1,1,0,1,0,1,0,1])
