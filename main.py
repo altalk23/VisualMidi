@@ -111,7 +111,6 @@ for msg, trck in relmessages:
         delta = 0
 
     time += delta
-    print(time, msg)
     if msg.is_meta:
         if msg.type == 'key_signature':
             keysignature = msg.key
@@ -133,10 +132,10 @@ for msg, trck in relmessages:
     elif msg.type == 'note_off' or msg.velocity == 0:
         data[cont[trck][msg.note].get()][1] = time
     maxtime = max(maxtime, time)
-
+'''
 for msg in data:
     print(msg[0], '\t', msg[1], '\t', msg[2], '\t', msg[3], '\t', msg[4])
-
+'''
 # Visual
 octave = np.array([1,0,1,0,1,1,0,1,0,1,0,1])
 keyboard = np.tile(octave, 11)[start:end]
@@ -174,7 +173,7 @@ maxcont = 1000
 cont = np.full((maxcont,2), -1, dtype=np.int8)
 windowheight = height-keyboardheight-2
 
-bar = IncrementalBar('Frames: ', max=int(maxtime/speed)+2, suffix='%(index)d / %(max)d', width=os.get_terminal_size()[0]-30)
+bar = IncrementalBar('Frames: ', max=int(maxtime + 3 * speed) // int(speed))+2, suffix='%(index)d / %(max)d', width=os.get_terminal_size()[0]-30)
 
 curr = 0
 frameidx = 0
@@ -241,8 +240,8 @@ for curr in range(0, int(maxtime + 3 * speed), int(speed)):
     elapsed = timedelta(seconds=min(curr/speed/fps, maxtime/speed/fps))
     endtime = timedelta(seconds=maxtime/speed/fps)
     draw.text((20, 22), "{0} / {1}".format(
-        '%02d:%02d:%02d.%06d' % (elapsed.seconds // 3600, (elapsed.seconds // 60) % 60, elapsed.seconds, elapsed.microseconds),
-        '%02d:%02d:%02d.%06d' % (endtime.seconds // 3600, (endtime.seconds // 60) % 60, endtime.seconds, endtime.microseconds)
+        '%02d:%02d:%02d.%06d' % (elapsed.seconds // 3600, (elapsed.seconds // 60) % 60, elapsed.seconds % 60, elapsed.microseconds),
+        '%02d:%02d:%02d.%06d' % (endtime.seconds // 3600, (endtime.seconds // 60) % 60, endtime.seconds % 60, endtime.microseconds)
     ),(255,255,255),font=font)
     frameimage = np.array(img)
 
@@ -251,7 +250,7 @@ for curr in range(0, int(maxtime + 3 * speed), int(speed)):
     clips.append(ImageClip(frameimage).set_duration(1/fps))
     if frameidx % recyclerate == recyclerate - 1: #write
         video = concatenate(clips, method="compose")
-        video.write_videofile('mem/%06d.mp4' % (frameidx), fps=fps, verbose=False, logger=None)
+        video.write_videofile('mem/%03d.mp4' % (frameidx//recyclerate), fps=fps, verbose=False, logger=None)
         clips = None
         del clips
         clips = []
