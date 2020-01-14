@@ -1,6 +1,6 @@
 from PIL import Image, ImageFont, ImageDraw
 import numpy as np
-from mido import MidiFile, tempo2bpm
+from mido import MidiFile, tempo2bpm, tick2second
 import argparse
 from heapq import heappush, heappop
 import os
@@ -39,15 +39,16 @@ parser.add_argument('-r', '--recycle-rate', type=int, default=96, help='frame co
 
 args = parser.parse_args()
 
+speedconstant = 480000000
 mid = MidiFile(args.midifile)
 audioname = args.audio
 width, height = args.width, args.height
 start, end = args.start, args.end+1
 keyboardheight = args.keyboard_height
-stretch = args.stretch * 960000000
+stretch = args.stretch * 2 * speedconstant
 outputname = args.output
 fps = args.fps
-speed = args.speed * (480000000 / fps) #480000000/24 1 second constant / 24 frame per second
+speed = args.speed * (speedconstant / fps) #480000000/24 1 second constant / 24 frame per second
 trackcount, maxnote = args.track_count, args.max_note
 maxtempo = args.max_tempo
 saveframes = args.save_frames
@@ -73,85 +74,69 @@ else:
         [255,255,255],
         [31,31,31]
     ]
-# Midi
-data = np.zeros((trackcount, maxnote, 4), dtype=np.uint64)
-cont = [Queue(maxsize=20) for _ in range(128)]
 
-keysignature = ''
-tempo = np.zeros((maxtempo, 2), dtype=np.uint64)
-
-
-'''
-time = 0
-# meta messages
-for msg in mid.tracks[0]:
-    #print(msg)
-    if metaidx == 0:
-        time += msg.time
-    else:
-        time += msg.time * tempo[idx-1][0]
-
-    if msg.type == 'key_signature':
-        keysignature = msg.key
-
-    elif msg.type == 'set_tempo':
-        tempo[metaidx] = [msg.tempo,time]
-        metaidx += 1
-'''
-
-maxtime = 0
-
-# track data
-for trackidx, track in enumerate(mid.tracks):
-    metaidx = 0
-    time = 0
-    idx = 0
-    tempoidx = 0
-
-    # musescore?
+messages = []
+relmessages = []
+datamessages = []
+for i, track in enumerate(mid.tracks):
+    now = 0
     for msg in track:
+        now += msg.time
+        messages.append((msg.copy(time=now), i))
+messages.sort(key=lambda msg: msg[0].time)
+now = 0
+for msg, trck in messages:
+    delta = msg.time - now
+    relmessages.append((msg.copy(time=delta), trck))
+    now = msg.time
 
-
-        if len(tempo) > 0:
-            time += msg.time * tempo[tempoidx][0]
-
-        if len(tempo) > 1 and time >= tempo[tempoidx+1][1] and tempo[tempoidx+1][1] > 0:
-            tempoidx += 1
-        #print(msg)
-        if msg.is_meta:
-            if msg.type == 'key_signature':
-                keysignature = msg.key
-
-            elif msg.type == 'set_tempo':
-                tempo[metaidx] = [msg.tempo,time]
-                metaidx += 1
-        elif msg.type == 'control_change':
-            pass # I don't what in earth is this
-        elif msg.type == 'program_change':
-            pass # Same for this
-        elif msg.type == 'pitchwheel':
-            pass # Same for this
-        elif msg.type == 'note_on' and msg.velocity > 0:
-            data[trackidx][idx] = [time, msg.note, msg.velocity, 0]
-            cont[msg.note].put(idx)
-            idx += 1
-
-        elif msg.type == 'note_off' or msg.velocity == 0:
-
-            data[trackidx][cont[msg.note].get()][3] = time
+data = np.zeros((maxnote, 5), dtype=np.uint64)
+cont = [[Queue(maxsize=20) for _ in range(128)] for _ in range(trackcount)]
+tempolist = []
+keysignature = ''
+timesignature = ''
+maxtime = 0
+time = 0
+idx = 0
+tempoidx = 0
+delta = 0
+for msg, trck in relmessages:
 
 
 
-        maxtime = max(maxtime, time)
+    if msg.time > 0:
+        delta = msg.time * tempo
+    else:
+        delta = 0
 
+    time += delta
 
+    if msg.is_meta:
+        if msg.type == 'key_signature':
+            keysignature = msg.key
+        elif msg.type == 'time_signature':
+            timesignature = '{0} / {1}'.format(msg.numerator, msg.denominator)
+        elif msg.type == 'set_tempo':
+            tempo = msg.tempo
+            tempolist.append((time, tempo2bpm(tempo)))
+    elif msg.type == 'control_change':
+        pass # I don't what in earth is this
+    elif msg.type == 'program_change':
+        pass # Same for this
+    elif msg.type == 'pitchwheel':
+        pass # Same for this
+    elif msg.type == 'note_on' and msg.velocity > 0:
+        data[idx] = [time, 0, trck, msg.note, msg.velocity]
+        cont[trck][msg.note].put(idx)
+        idx += 1
+    elif msg.type == 'note_off' or msg.velocity == 0:
+        data[cont[trck][msg.note].get()][1] = time
+    maxtime = max(maxtime, time)
 
-    #print('')
-#print(data)
-#print(tempo)
-
-
-
+'''
+for msg in data:
+    print(msg[0], '\t', msg[1], '\t', msg[2], '\t', msg[3], '\t', msg[4])
+'''
 
 # Visual
 octave = np.array([1,0,1,0,1,1,0,1,0,1,0,1])
@@ -186,56 +171,46 @@ for note in range(end-start):
 
 # Notes
 
-maxcont = 200
-idx = np.zeros((trackcount, 2), dtype=np.uint32)
+maxcont = 1000
 cont = np.full((maxcont,2), -1, dtype=np.int8)
 windowheight = height-keyboardheight-2
 
-curr = 0
-seen = []
-
 bar = IncrementalBar('Frames: ', max=int(maxtime/speed)+2, suffix='%(index)d / %(max)d', width=os.get_terminal_size()[0]-30)
+
+curr = 0
 frameidx = 0
-
-pressed = np.full((128), -1, dtype=np.int8)
-
+idx = 0
+tempoidx = 0
+seen = []
 pressed = [[] for _ in range(128)]
-
 clips = []
 
 if saveframes: os.system('rm -rf out > /dev/null ; mkdir out')
 os.system('rm -rf mem > /dev/null ; mkdir mem')
 
 
-tempoidx = 0
+tempoidx = 1
 for curr in range(0, int(maxtime + 3 * speed), int(speed)):
-    #print(pressed)
-    #print('')
-    frameimage = np.zeros((height, width, 3), dtype=np.uint8)
-    if curr > tempo[tempoidx+1][1] and tempo[tempoidx+1][1] > 0: tempoidx += 1
-    # add incoming notes
-    print(seen)
-    print(pressed)
-    for trackidx, track in enumerate(data):
-        while idx[trackidx][0] < maxnote and track[idx[trackidx][0]][0] < stretch + curr :
-            if track[idx[trackidx][0]][3] != 0:
-                #print("pushing {0}".format((track[idx[trackidx][0]][3], track[idx[trackidx][0]][0], track[idx[trackidx][0]][1], trackidx)))
-                insort_left(seen, (track[idx[trackidx][0]][0], track[idx[trackidx][0]][3], track[idx[trackidx][0]][1], trackidx))
-                #heappush(seen, (track[idx[trackidx][0]][3], track[idx[trackidx][0]][0], track[idx[trackidx][0]][1], trackidx))
-            idx[trackidx][0]+=1
+
+    while idx < maxnote and data[idx][0] < stretch + curr :
+        if data[idx][1] != 0:
+            insort_left(seen, tuple(data[idx]))
+        idx+=1
+
+    while tempoidx < len(tempolist) and tempolist[tempoidx][0] < curr: tempoidx+=1
 
     pressed = [[] for _ in range(128)]
     pressedidx = 0
     for s in seen:
         if s[0] <= curr:
-            pressed[s[2]].append(s[3])
+            pressed[s[3]].append(s[2])
         else: break
         pressedidx+=1
 
-    # remove past notes
     for i, s in enumerate(seen):
         if s[1] <= curr:
-            pressed[s[2]].pop()
+            pressed[s[3]].pop()
+
     seen = [s for s in seen if s[1] > curr ]
         #seen = seen[:i] + seen[i+1:]
 
@@ -252,18 +227,18 @@ for curr in range(0, int(maxtime + 3 * speed), int(speed)):
 
     #print(seen)
     for s in seen:
-        print(s)
+        #print(s)
         h = (
             int(windowheight-max((s[0]-curr)/speed, 0) * (windowheight * speed / stretch)),
             int(windowheight-min((s[1]-curr)/speed, stretch/speed) * (windowheight * speed / stretch))
         )
-        w = notes[int(s[2]-start)][0:2]
-        frameimage[h[1]+1:max(h[0]-1, 0), w[0]+1:w[1]-1] = colors[s[3]]
+        w = notes[int(s[3]-start)][0:2]
+        frameimage[h[1]+1:max(h[0]-1, 0), w[0]+1:w[1]-1] = colors[s[2]]
 
     img = Image.fromarray(frameimage, 'RGB')
     draw = ImageDraw.Draw(img)
     font = ImageFont.truetype(fontname, 32)
-    draw.text((20, windowheight - 54), "Key Signature: {0}, Tempo: {1}".format(keysignature, tempo2bpm(tempo[tempoidx][0])),(255,255,255),font=font)
+    draw.text((20, windowheight - 54), "Key Signature: {0}, Time Signature: {1}, Tempo: {2}".format(keysignature,  timesignature, round(tempolist[tempoidx-1][1], 3)),(255,255,255),font=font)
     elapsed = timedelta(seconds=min(curr/speed/fps, maxtime/speed/fps))
     endtime = timedelta(seconds=maxtime/speed/fps)
     draw.text((20, 22), "{0} / {1}".format(
